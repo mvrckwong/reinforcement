@@ -1,0 +1,16 @@
+{
+  "algorithm": "IMPALA",
+  "environment": "CartPole-v1",
+  "timestamp": "20251018_221334",
+  "training_iterations": 10,
+  "final_reward_mean": 43.64,
+  "final_episode_length": 43.64,
+  "final_episodes": 267.0,
+  "hyperparameters": {
+    "gamma": 0.99,
+    "lr": 0.0005,
+    "train_batch_size": 512,
+    "num_env_runners": 4,
+    "num_learners": 0
+  }
+}
