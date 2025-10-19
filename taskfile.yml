@@ -1,0 +1,7 @@
+version: '3'
+
+tasks:
+  train:
+    desc: Train the IMPALA agent
+    cmds:
+      - uv run python scripts/train.py
