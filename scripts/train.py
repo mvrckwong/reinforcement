@@ -16,14 +16,17 @@ config = (
     IMPALAConfig()
     .environment("CartPole-v1")
     .learners(num_learners=0)
-    .env_runners(num_env_runners=4)
+    .env_runners(num_env_runners=2)
     .training(
-        gamma=0.99,
+        gamma=0.995,
         lr=[
             [0, LR_START],
             [LR_SCHEDULE_TIMESTEPS, LR_END],
         ],
-        train_batch_size=512,
+        train_batch_size=2048,
+        entropy_coeff=0.01,
+        vf_loss_coeff=0.5,
+        grad_clip=40.0,
     )
     .callbacks(
         # Use new callback-based loggers instead of deprecated ones
@@ -31,11 +34,11 @@ config = (
     )
     .reporting(
         # Wait for meaningful work each iteration
-        min_time_s_per_iteration=1,
-        min_sample_timesteps_per_iteration=1000,
+        min_time_s_per_iteration=2,
+        min_sample_timesteps_per_iteration=4000,
     )
     .resources(num_gpus=0)
-    .debugging(log_level="ERROR")
+    .debugging(log_level="ERROR", seed=42)
 )
 
 # Build algorithm
