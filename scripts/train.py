@@ -5,26 +5,32 @@ from typing import Any, Mapping
 
 load_dotenv()
 
-# Dynamic LR schedule settings
+# -----------------------------------------------------------------------------
+# Defaults
+# -----------------------------------------------------------------------------
+
 LR_START = 5e-4
 LR_END = 1e-4
-# Approximate over 100 iterations x 1k timesteps/iter => 100k timesteps
 LR_SCHEDULE_TIMESTEPS = 100_000
+
+# -----------------------------------------------------------------------------
+# Conguration
+# -----------------------------------------------------------------------------
 
 # Configure IMPALA
 config = (
     IMPALAConfig()
     .environment("CartPole-v1")
     .learners(num_learners=0)
-    .env_runners(num_env_runners=2)
+    .env_runners(num_env_runners=4)
     .training(
         gamma=0.995,
         lr=[
             [0, LR_START],
             [LR_SCHEDULE_TIMESTEPS, LR_END],
         ],
-        train_batch_size=2048,
-        entropy_coeff=0.01,
+        train_batch_size=4096,
+        entropy_coeff=0.005,
         vf_loss_coeff=0.5,
         grad_clip=40.0,
     )
