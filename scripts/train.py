@@ -60,7 +60,10 @@ for i in tqdm(range(100), desc="Training", unit="iter"):
     episodes = _metric(result, "num_episodes", default=_metric(result, "episodes_total", 0))
     reward = _metric(result, "episode_return_mean", default=_metric(result, "episode_reward_mean", 0.0))
     length = _metric(result, "episode_len_mean", default=0.0)
+    steps = _metric(result, "num_env_steps_sampled", default=_metric(result, "env_steps_sampled", 0))
 
-    tqdm.write(f"Iter {i+1:2d} | Episodes: {episodes:6.0f} | Reward: {reward:6.2f} | Length: {length:6.2f}")
+    tqdm.write(
+        f"Iter {i+1:2d} | Episodes: {episodes:6.0f} | Reward: {reward:6.2f} | Length: {length:6.2f} | Steps: {steps:8.0f}"
+    )
 
 algo.stop()
