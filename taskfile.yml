@@ -5,3 +5,18 @@ tasks:
     desc: Train the IMPALA agent
     cmds:
       - uv run python scripts/train.py
+
+  version-update-major:
+    desc: Update the major version of the project
+    cmds:
+      - uv version --bump major
+
+  version-update-minor:
+    desc: Update the minor version of the project
+    cmds:
+      - uv version --bump minor
+  
+  version-update-patch:
+    desc: Update the patch version of the project
+    cmds:
+      - uv version --bump patch
