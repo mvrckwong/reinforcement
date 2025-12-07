@@ -1,4 +1,4 @@
-from ray.rllib.algorithms.impala import IMPALAConfig
+from ray.rllib.algorithms.impala import ImpalaConfig
 from tqdm import tqdm
 from dotenv import load_dotenv
 from typing import Any, Mapping
@@ -14,29 +14,21 @@ LR_END = 1e-4
 LR_SCHEDULE_TIMESTEPS = 100_000
 
 # -----------------------------------------------------------------------------
-# Conguration
+# Configuration
 # -----------------------------------------------------------------------------
 
 # Configure IMPALA
 config = (
-    IMPALAConfig()
+    ImpalaConfig()
     .environment("CartPole-v1")
-    .learners(num_learners=0)
-    .env_runners(num_env_runners=4)
+    .rollouts(num_rollout_workers=4)
     .training(
         gamma=0.995,
-        lr=[
-            [0, LR_START],
-            [LR_SCHEDULE_TIMESTEPS, LR_END],
-        ],
+        lr=5e-4,
         train_batch_size=4096,
         entropy_coeff=0.005,
         vf_loss_coeff=0.5,
         grad_clip=40.0,
-    )
-    .callbacks(
-        # Use new callback-based loggers instead of deprecated ones
-        callbacks_class=None  # Disable default callbacks
     )
     .reporting(
         # Wait for meaningful work each iteration
@@ -48,9 +40,8 @@ config = (
 )
 
 # Build algorithm
-algo = config.build_algo()
+algo = config.build()
 print("Training IMPALA on CartPole-v1...")
-
 
 def _metric(result: Mapping[str, Any], key: str, default: float | int = 0) -> float | int:
     """Return metric from result, checking env_runners first, then top-level.
