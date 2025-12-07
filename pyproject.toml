@@ -3,7 +3,7 @@ name = "reinforcement-learning"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "gputil>=1.4.0",
     "gymnasium>=0.28.1",
@@ -11,7 +11,7 @@ dependencies = [
     "ipywidgets>=8.1.7",
     "python-dotenv>=1.1.1",
     "ray[rllib]>=2.7.2",
-    "setuptools>=80.9.0",
+    "setuptools>=65,<70",
     "torch>=2.0.0,<2.5.0",
     "tqdm>=4.67.1",
 ]
