@@ -2,6 +2,8 @@ from ray.rllib.algorithms.impala import ImpalaConfig
 from tqdm import tqdm
 from dotenv import load_dotenv
 from typing import Any, Mapping
+from pathlib import Path
+from datetime import datetime
 
 load_dotenv()
 
@@ -43,6 +45,11 @@ config = (
 algo = config.build()
 print("Training IMPALA on CartPole-v1...")
 
+# Create checkpoint directory with timestamp
+checkpoint_dir = Path("checkpoints") / "impala_cartpole" / datetime.now().strftime("%Y%m%d_%H%M%S")
+checkpoint_dir.mkdir(parents=True, exist_ok=True)
+print(f"Checkpoints will be saved to: {checkpoint_dir}")
+
 def _metric(result: Mapping[str, Any], key: str, default: float | int = 0) -> float | int:
     """Return metric from result, checking env_runners first, then top-level.
     Falls back to default if neither exists.
@@ -65,5 +72,14 @@ for i in tqdm(range(100), desc="Training", unit="iter"):
     tqdm.write(
         f"Iter {i+1:2d} | Episodes: {episodes:6.0f} | Reward: {reward:6.2f} | Length: {length:6.2f} | Steps: {steps:8.0f}"
     )
+    
+    # Save checkpoint every 10 iterations
+    if (i + 1) % 10 == 0:
+        checkpoint_path = algo.save(str(checkpoint_dir))
+        tqdm.write(f"Checkpoint saved at: {checkpoint_path}")
+
+# Save final checkpoint
+final_checkpoint = algo.save(str(checkpoint_dir))
+print(f"Final checkpoint saved at: {final_checkpoint}")
 
 algo.stop()
