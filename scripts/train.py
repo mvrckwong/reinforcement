@@ -3,8 +3,12 @@ from tqdm import tqdm
 from dotenv import load_dotenv
 from typing import Any, Mapping
 from datetime import datetime
+import os
+import tempfile
+import shutil
 
 from configs.paths import Paths
+from utils.s3_upload import upload_directory_to_s3
 
 load_dotenv(Paths.ENV_FILE)
 
@@ -46,10 +50,15 @@ config = (
 algo = config.build()
 print("Training IMPALA on CartPole-v1...")
 
-# Create checkpoint directory with timestamp
-checkpoint_dir = Paths.CHECKPOINTS_DIR / "impala_cartpole" / datetime.now().strftime("%Y%m%d_%H%M%S")
-checkpoint_dir.mkdir(parents=True, exist_ok=True)
-print(f"Checkpoints will be saved to: {checkpoint_dir}")
+# Check if S3 is configured
+use_s3 = bool(os.getenv('S3_ENDPOINT_URL'))
+if use_s3:
+    print("S3 enabled: Checkpoints will be uploaded to MinIO and cleaned up locally")
+else:
+    # Only create persistent directory if not using S3
+    checkpoint_dir = Paths.CHECKPOINTS_DIR / "impala_cartpole" / datetime.now().strftime("%Y%m%d_%H%M%S")
+    checkpoint_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Checkpoints will be saved to: {checkpoint_dir}")
 
 def _metric(result: Mapping[str, Any], key: str, default: float | int = 0) -> float | int:
     """Return metric from result, checking env_runners first, then top-level.
@@ -76,11 +85,38 @@ for i in tqdm(range(100), desc="Training", unit="iter"):
     
     # Save checkpoint every 10 iterations
     if (i + 1) % 10 == 0:
-        checkpoint_path = algo.save(str(checkpoint_dir))
-        tqdm.write(f"Checkpoint saved at: {checkpoint_path}")
+        if use_s3:
+            # Create temp dir, save, upload, and immediately clean up
+            temp_checkpoint = tempfile.mkdtemp(prefix="impala_ckpt_")
+            checkpoint_path = algo.save(temp_checkpoint)
+            tqdm.write(f"Checkpoint saved, uploading to S3...")
+            
+            bucket_name = os.getenv('S3_BUCKET_NAME', 'model')
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            s3_prefix = f"impala_cartpole/{timestamp}"
+            
+            if upload_directory_to_s3(temp_checkpoint, bucket_name, s3_prefix):
+                shutil.rmtree(temp_checkpoint, ignore_errors=True)
+        else:
+            checkpoint_path = algo.save(str(checkpoint_dir))
+            tqdm.write(f"Checkpoint saved at: {checkpoint_path}")
 
 # Save final checkpoint
-final_checkpoint = algo.save(str(checkpoint_dir))
-print(f"Final checkpoint saved at: {final_checkpoint}")
+if use_s3:
+    # Create temp dir, save, upload, and immediately clean up
+    temp_checkpoint = tempfile.mkdtemp(prefix="impala_ckpt_final_")
+    final_checkpoint = algo.save(temp_checkpoint)
+    print("Final checkpoint saved, uploading to S3...")
+    
+    bucket_name = os.getenv('S3_BUCKET_NAME', 'model')
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    s3_prefix = f"impala_cartpole/{timestamp}_final"
+    
+    if upload_directory_to_s3(temp_checkpoint, bucket_name, s3_prefix):
+        shutil.rmtree(temp_checkpoint, ignore_errors=True)
+        print("Final checkpoint uploaded successfully")
+else:
+    final_checkpoint = algo.save(str(checkpoint_dir))
+    print(f"Final checkpoint saved at: {final_checkpoint}")
 
 algo.stop()
