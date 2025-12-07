@@ -1,30 +1,60 @@
-from os import getenv
 from boto3 import client as boto3_client
 from pathlib import Path
 from typing import Optional
 from botocore.client import Config, BaseClient
 from botocore.exceptions import ClientError
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from pydantic import Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class S3Settings(BaseSettings):
+    """S3/MinIO configuration settings loaded from environment variables."""
+    
+    model_config = SettingsConfigDict(
+        env_file='.env',
+        env_file_encoding='utf-8',
+        case_sensitive=True,
+        extra='ignore'
+    )
+    
+    endpoint_url: str = Field(
+        ..., 
+        alias='S3_ENDPOINT_URL',
+        description="S3/MinIO endpoint URL (e.g., https://localhost:9000)"
+    )
+    access_key_id: str = Field(
+        ..., 
+        alias='S3_ACCESS_KEY_ID',
+        description="S3 access key ID"
+    )
+    secret_access_key: str = Field(
+        ..., 
+        alias='S3_SECRET_ACCESS_KEY',
+        description="S3 secret access key"
+    )
+    region: str = Field(
+        default='us-east-1',
+        alias='S3_REGION',
+        description="AWS region"
+    )
+    
+    @property
+    def use_ssl(self) -> bool:
+        """Determine if SSL should be used based on endpoint URL."""
+        return self.endpoint_url.startswith('https')
 
 
 def get_s3_client() -> BaseClient:
     """Create and return an S3 client configured for MinIO with retry logic."""
-    endpoint_url = getenv('S3_ENDPOINT_URL')
-    if not endpoint_url:
-        raise ValueError("S3_ENDPOINT_URL not set in environment")
-    
-    access_key = getenv('S3_ACCESS_KEY_ID')
-    secret_key = getenv('S3_SECRET_ACCESS_KEY')
-    
-    if not access_key or not secret_key:
-        raise ValueError("S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be set")
+    settings = S3Settings()
     
     return boto3_client(
         's3',
-        endpoint_url=endpoint_url,
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        region_name=getenv('S3_REGION', 'us-east-1'),
+        endpoint_url=settings.endpoint_url,
+        aws_access_key_id=settings.access_key_id,
+        aws_secret_access_key=settings.secret_access_key,
+        region_name=settings.region,
         config=Config(
             signature_version='s3v4',
             retries={
@@ -34,7 +64,7 @@ def get_s3_client() -> BaseClient:
             connect_timeout=5,
             read_timeout=60
         ),
-        use_ssl=endpoint_url.startswith('https')
+        use_ssl=settings.use_ssl
     )
 
 
