@@ -1,45 +1,72 @@
-import os
-import boto3
+from os import getenv
+from boto3 import client as boto3_client
 from pathlib import Path
 from typing import Optional
-from botocore.client import Config
+from botocore.client import Config, BaseClient
+from botocore.exceptions import ClientError
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 
-def get_s3_client():
-    """Create and return an S3 client configured for MinIO."""
-    endpoint_url = os.getenv('S3_ENDPOINT_URL')
+def get_s3_client() -> BaseClient:
+    """Create and return an S3 client configured for MinIO with retry logic."""
+    endpoint_url = getenv('S3_ENDPOINT_URL')
     if not endpoint_url:
         raise ValueError("S3_ENDPOINT_URL not set in environment")
     
-    access_key = os.getenv('S3_ACCESS_KEY_ID')
-    secret_key = os.getenv('S3_SECRET_ACCESS_KEY')
+    access_key = getenv('S3_ACCESS_KEY_ID')
+    secret_key = getenv('S3_SECRET_ACCESS_KEY')
     
     if not access_key or not secret_key:
         raise ValueError("S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY must be set")
     
-    return boto3.client(
+    return boto3_client(
         's3',
         endpoint_url=endpoint_url,
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
-        region_name=os.getenv('S3_REGION', 'us-east-1'),
-        config=Config(signature_version='s3v4'),
-        use_ssl=False  # Set to True if using https://
+        region_name=getenv('S3_REGION', 'us-east-1'),
+        config=Config(
+            signature_version='s3v4',
+            retries={
+                'max_attempts': 3,
+                'mode': 'adaptive'  # Adapts retry strategy based on response
+            },
+            connect_timeout=5,
+            read_timeout=60
+        ),
+        use_ssl=endpoint_url.startswith('https')
     )
 
 
+def _upload_single_file(s3_client, file_path: Path, bucket_name: str, s3_key: str) -> tuple[str, bool, str]:
+    """Upload a single file to S3 (retries handled by boto3 client config)."""
+    try:
+        s3_client.upload_file(
+            str(file_path),
+            bucket_name,
+            s3_key
+        )
+        return (file_path.name, True, "")
+    except Exception as e:
+        return (file_path.name, False, str(e))
+
+
 def upload_directory_to_s3(
-    local_dir: Path,
+    local_dir: Path | str,
     bucket_name: str,
     s3_prefix: Optional[str] = None,
+    max_workers: int = 4,
+    verbose: bool = False,
 ) -> bool:
     """
-    Upload a directory and all its contents to S3/MinIO.
+    Upload a directory and all its contents to S3/MinIO with concurrent uploads.
     
     Args:
         local_dir: Local directory path to upload
         bucket_name: S3 bucket name
-        s3_prefix: Optional prefix path in S3 (e.g., 'checkpoints/impala')
+        s3_prefix: Optional prefix path in S3 (e.g., 'impala_cartpole/20241207_120000')
+        max_workers: Number of concurrent upload threads (default: 4)
+        verbose: Print detailed error messages (default: False)
     
     Returns:
         True if successful, False otherwise
@@ -48,12 +75,30 @@ def upload_directory_to_s3(
         s3_client = get_s3_client()
         local_dir = Path(local_dir)
         
-        file_count = 0
-        # Walk through all files in the directory
+        if not local_dir.exists():
+            print(f"✗ Error: Directory does not exist: {local_dir}")
+            return False
+        
+        # Validate bucket exists (silently)
+        try:
+            s3_client.head_bucket(Bucket=bucket_name)
+        except ClientError as e:
+            if verbose:
+                error_code = e.response.get('Error', {}).get('Code', '')
+                if error_code == '404':
+                    print(f"S3 Error: Bucket '{bucket_name}' does not exist")
+                elif error_code == '403':
+                    print(f"S3 Error: Access denied to bucket '{bucket_name}'")
+                else:
+                    print(f"S3 Error: {e}")
+            return False
+        
+        # Collect all files to upload
+        files_to_upload = []
         for file_path in local_dir.rglob('*'):
             if file_path.is_file():
-                # Calculate relative path for S3 key
-                relative_path = file_path.relative_to(local_dir.parent)
+                # Calculate relative path from local_dir (not local_dir.parent)
+                relative_path = file_path.relative_to(local_dir)
                 
                 # Construct S3 key
                 if s3_prefix:
@@ -61,30 +106,58 @@ def upload_directory_to_s3(
                 else:
                     s3_key = str(relative_path).replace('\\', '/')
                 
-                # Upload file
-                print(f"  Uploading {file_path.name} to s3://{bucket_name}/{s3_key}")
-                s3_client.upload_file(
-                    str(file_path),
-                    bucket_name,
-                    s3_key
-                )
-                file_count += 1
+                files_to_upload.append((file_path, s3_key))
         
-        print(f"✓ Successfully uploaded {file_count} files from {local_dir.name} to S3")
+        if not files_to_upload:
+            if verbose:
+                print(f"No files found in {local_dir}")
+            return False
+        
+        # Upload files concurrently
+        successful = 0
+        failed_files = []
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all upload tasks
+            futures = {
+                executor.submit(_upload_single_file, s3_client, file_path, bucket_name, s3_key): file_path.name
+                for file_path, s3_key in files_to_upload
+            }
+            
+            # Process completed uploads
+            for future in as_completed(futures):
+                filename, success, error = future.result()
+                if success:
+                    successful += 1
+                else:
+                    failed_files.append((filename, error))
+        
+        if failed_files:
+            if verbose:
+                print(f"S3 upload errors: {len(failed_files)} failed")
+                for fname, err in failed_files[:3]:  # Show first 3 errors
+                    print(f"  - {fname}: {err}")
+            return False
+        
         return True
         
     except ValueError as e:
-        print(f"✗ Configuration error: {e}")
-        print("  Please check your .env file settings")
+        if verbose:
+            print(f"S3 config error: {e}")
+        return False
+    except ClientError as e:
+        if verbose:
+            error_code = e.response.get('Error', {}).get('Code', '')
+            error_msg = e.response.get('Error', {}).get('Message', str(e))
+            
+            if 'InvalidArgument' in error_code and 'API port' in error_msg:
+                print(f"S3 Error: Wrong API port (use 9000, not 9002)")
+            else:
+                print(f"S3 Error ({error_code}): {error_msg}")
         return False
     except Exception as e:
-        error_msg = str(e)
-        if "API port" in error_msg:
-            print(f"✗ Error: Wrong port for MinIO API")
-            print(f"  Hint: Port 9002 is typically the console UI. Try port 9000 for the API.")
-            print(f"  Update S3_ENDPOINT_URL in your .env file to: http://192.168.1.105:9000")
-        else:
-            print(f"✗ Error uploading to S3: {e}")
+        if verbose:
+            print(f"S3 upload error: {e}")
         return False
 
 
