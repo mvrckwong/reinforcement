@@ -2,10 +2,11 @@ from ray.rllib.algorithms.impala import ImpalaConfig
 from tqdm import tqdm
 from dotenv import load_dotenv
 from typing import Any, Mapping
-from pathlib import Path
 from datetime import datetime
 
-load_dotenv()
+from configs.paths import Paths
+
+load_dotenv(Paths.ENV_FILE)
 
 # -----------------------------------------------------------------------------
 # Defaults
@@ -46,7 +47,7 @@ algo = config.build()
 print("Training IMPALA on CartPole-v1...")
 
 # Create checkpoint directory with timestamp
-checkpoint_dir = Path("checkpoints") / "impala_cartpole" / datetime.now().strftime("%Y%m%d_%H%M%S")
+checkpoint_dir = Paths.CHECKPOINTS_DIR / "impala_cartpole" / datetime.now().strftime("%Y%m%d_%H%M%S")
 checkpoint_dir.mkdir(parents=True, exist_ok=True)
 print(f"Checkpoints will be saved to: {checkpoint_dir}")
 
