@@ -5,7 +5,7 @@ tasks:
   train:
     desc: Train the IMPALA agent
     cmds:
-      - uv run python scripts/train.py
+      - uv run python src/train.py
 
   # Utility tasks
   version-update-major:

@@ -8,7 +8,7 @@ import tempfile
 import shutil
 
 from configs.paths import Paths
-from utils.s3_upload import upload_directory_to_s3
+from utils.s3_upload import S3Uploader
 
 load_dotenv(Paths.ENV_FILE)
 
@@ -52,7 +52,13 @@ print("Training IMPALA on CartPole-v1...")
 
 # Check if S3 is configured
 use_s3 = bool(getenv('S3_ENDPOINT_URL'))
-if not use_s3:
+s3_uploader = None
+
+if use_s3:
+    # Initialize S3 uploader once for reuse
+    s3_uploader = S3Uploader()
+    print("S3 upload configured - checkpoints will be uploaded to S3")
+else:
     # Only create persistent directory if not using S3
     checkpoint_dir = Paths.CHECKPOINTS_DIR / "impala_cartpole" / datetime.now().strftime("%Y%m%d_%H%M%S")
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
@@ -92,7 +98,7 @@ for i in tqdm(range(100), desc="Training", unit="iter"):
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             s3_prefix = f"impala_cartpole/{timestamp}"
             
-            if upload_directory_to_s3(temp_checkpoint, bucket_name, s3_prefix):
+            if s3_uploader.upload_directory(temp_checkpoint, bucket_name, s3_prefix):
                 shutil.rmtree(temp_checkpoint, ignore_errors=True)
                 tqdm.write(f"✓ Checkpoint uploaded to S3")
             else:
@@ -107,11 +113,11 @@ if use_s3:
     temp_checkpoint = tempfile.mkdtemp(prefix="impala_ckpt_final_")
     algo.save(temp_checkpoint)
     
-    bucket_name = os.getenv('S3_BUCKET_NAME', 'model')
+    bucket_name = getenv('S3_BUCKET_NAME', 'model')
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     s3_prefix = f"impala_cartpole/{timestamp}_final"
     
-    if upload_directory_to_s3(temp_checkpoint, bucket_name, s3_prefix):
+    if s3_uploader.upload_directory(temp_checkpoint, bucket_name, s3_prefix):
         shutil.rmtree(temp_checkpoint, ignore_errors=True)
         print("✓ Final checkpoint uploaded to S3")
     else:
