@@ -1,11 +1,13 @@
 version: '3'
 
 tasks:
+  # Training tasks
   train:
     desc: Train the IMPALA agent
     cmds:
       - uv run python scripts/train.py
 
+  # Utility tasks
   version-update-major:
     desc: Update the major version of the project
     cmds:

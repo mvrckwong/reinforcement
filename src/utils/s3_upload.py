@@ -4,29 +4,8 @@ from typing import Optional
 from botocore.client import Config, BaseClient
 from botocore.exceptions import ClientError
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from pydantic import Field
-from pydantic_settings import BaseSettings, SettingsConfigDict
 
-
-class S3Settings(BaseSettings):
-    """S3/MinIO configuration settings loaded from environment variables."""
-    
-    endpoint_url: str = Field(..., alias='S3_ENDPOINT_URL', description="S3/MinIO endpoint URL (e.g., https://localhost:9000)")
-    access_key_id: str = Field(..., alias='S3_ACCESS_KEY_ID', description="S3 access key ID")
-    secret_access_key: str = Field(..., alias='S3_SECRET_ACCESS_KEY', description="S3 secret access key")
-    region: str = Field(default='us-east-1', alias='S3_REGION', description="AWS region")
-
-    model_config = SettingsConfigDict(
-        env_file='.env',
-        env_file_encoding='utf-8',
-        case_sensitive=True,
-        extra='ignore'
-    )
-    
-    @property
-    def use_ssl(self) -> bool:
-        """Determine if SSL should be used based on endpoint URL."""
-        return self.endpoint_url.startswith('https')
+from configs.storage import S3Settings
 
 
 def get_s3_client() -> BaseClient:
