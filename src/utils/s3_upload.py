@@ -9,7 +9,7 @@ from configs.storage import S3Settings
 
 
 class S3Uploader:
-    """Handles S3/MinIO upload operations with dependency injection and reusable client."""
+    """ Handles S3/MinIO upload operations with dependency injection and reusable client."""
     
     def __init__(self, settings: Optional[S3Settings] = None):
         """

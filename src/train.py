@@ -2,7 +2,7 @@ from ray.rllib.algorithms.impala import ImpalaConfig
 from tqdm import tqdm
 from dotenv import load_dotenv
 from typing import Any, Mapping
-from datetime import datetime
+import pendulum
 from os import getenv
 import tempfile
 import shutil
@@ -60,7 +60,7 @@ if use_s3:
     print("S3 upload configured - checkpoints will be uploaded to S3")
 else:
     # Only create persistent directory if not using S3
-    checkpoint_dir = Paths.CHECKPOINTS_DIR / "impala_cartpole" / datetime.now().strftime("%Y%m%d_%H%M%S")
+    checkpoint_dir = Paths.CHECKPOINTS_DIR / "impala_cartpole" / pendulum.now().format("YYYYMMDD_HHmmss")
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
     print(f"Checkpoints will be saved to: {checkpoint_dir}")
 
@@ -95,7 +95,7 @@ for i in tqdm(range(100), desc="Training", unit="iter"):
             algo.save(temp_checkpoint)
             
             bucket_name = getenv('S3_BUCKET_NAME', 'model')
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = pendulum.now().format("YYYYMMDD_HHmmss")
             s3_prefix = f"impala_cartpole/{timestamp}"
             
             if s3_uploader.upload_directory(temp_checkpoint, bucket_name, s3_prefix):
@@ -114,7 +114,7 @@ if use_s3:
     algo.save(temp_checkpoint)
     
     bucket_name = getenv('S3_BUCKET_NAME', 'model')
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    timestamp = pendulum.now().format("YYYYMMDD_HHmmss")
     s3_prefix = f"impala_cartpole/{timestamp}_final"
     
     if s3_uploader.upload_directory(temp_checkpoint, bucket_name, s3_prefix):
