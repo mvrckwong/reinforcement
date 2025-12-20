@@ -34,14 +34,17 @@ class LoggingConfig(BaseSettings):
     
     level: Literal["TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"] = Field(
         default="INFO",
+        alias="LOG_LEVEL",
         description="Minimum log level to capture."
     )
     retention: str = Field(
         default="7 days",
+        alias="LOG_RETENTION",
         description="How long to retain log files."
     )
     serialize: bool = Field(
         default=False,
+        alias="LOG_SERIALIZE",
         description="Whether to serialize logs as JSON."
     )
     
@@ -51,6 +54,7 @@ class LoggingConfig(BaseSettings):
         env_file_encoding="utf-8",
         frozen=True,
         extra="ignore",
+        populate_by_name=True,
     )
 
 
