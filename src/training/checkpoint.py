@@ -58,7 +58,7 @@ class CheckpointManager:
     def _log_storage_mode(self) -> None:
         """Log which storage mode is being used."""
         if self._s3_available:
-            print(f"✓ S3 available - checkpoints will be saved to s3://{self.s3_paths.bucket_name}/{self.s3_paths.checkpoints_prefix}")
+            print(f"✓ S3 available - checkpoints will be saved to s3://{self.s3_paths.bucket_name}")
         else:
             print("✗ S3 not available - using local storage")
             self._setup_local_dir()
@@ -129,7 +129,7 @@ class CheckpointManager:
             success = uploader.upload_directory(
                 temp_dir,
                 self.s3_paths.bucket_name,
-                f"{self.s3_paths.checkpoints_prefix}/{s3_key}",
+                s3_key,
             )
             
             if is_verbose and success:

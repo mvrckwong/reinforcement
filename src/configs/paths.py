@@ -65,11 +65,6 @@ class S3Paths(BaseSettings):
         alias='S3_LOGS_BUCKET_NAME',
         description="S3 bucket for logs"
     )
-    checkpoints_prefix: str = Field(
-        default='checkpoints', 
-        alias='S3_CHECKPOINTS_PREFIX',
-        description="S3 prefix for checkpoint storage"
-    )
     
     model_config = SettingsConfigDict(
         env_file='.env',
