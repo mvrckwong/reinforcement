@@ -99,13 +99,13 @@ class LoggingManager:
 
 def upload_run_logs(
     context: RunContext, 
-    verbose: bool = True,
+    is_verbose: bool = True,
 ) -> bool:
     """Upload a run's log file to S3.
     
     Args:
         context: Run context identifying the training run.
-        verbose: Print status messages.
+        is_verbose: Print status messages.
         
     Returns:
         True if upload succeeded, False otherwise.
@@ -118,7 +118,7 @@ def upload_run_logs(
     # Get the log file path and check if it exists
     log_file = paths.logs_dir / context.log_filename
     if not log_file.exists():
-        if verbose:
+        if is_verbose:
             logger.warning(f"Log file not found: {log_file}")
         return False
     
@@ -129,12 +129,14 @@ def upload_run_logs(
         local_path=log_file,
         bucket_name=s3_paths.logs_bucket_name,
         s3_key=s3_key,
-        verbose=verbose,
+        verbose=is_verbose,
     )
     
     # Log success or failure
-    if is_uploaded and verbose:
-        logger.success(f"Log uploaded to s3://{s3_paths.logs_bucket_name}/{s3_key}")
+    if is_uploaded and is_verbose:
+        logger.success(
+            f"Log uploaded to s3://{s3_paths.logs_bucket_name}/{s3_key}"
+        )
     
     return is_uploaded
 
