@@ -47,11 +47,6 @@ class Paths(BaseSettings):
         return _PROJECT_ROOT
 
 
-@lru_cache(maxsize=1)
-def get_paths() -> Paths:
-    return Paths()
-
-
 class S3Paths(BaseSettings):
     """S3 path structure configuration (environment-configurable).
     
@@ -62,17 +57,17 @@ class S3Paths(BaseSettings):
     bucket_name: str = Field(
         default='model', 
         alias='S3_BUCKET_NAME',
-        description="Default S3 bucket for model artifacts"
+        description="S3 bucket for checkpoints"
+    )
+    logs_bucket_name: str = Field(
+        default='logging', 
+        alias='S3_LOGS_BUCKET_NAME',
+        description="S3 bucket for logs"
     )
     checkpoints_prefix: str = Field(
         default='checkpoints', 
         alias='S3_CHECKPOINTS_PREFIX',
         description="S3 prefix for checkpoint storage"
-    )
-    logs_prefix: str = Field(
-        default='logging', 
-        alias='S3_LOGS_PREFIX',
-        description="S3 prefix for log storage"
     )
     
     model_config = SettingsConfigDict(
@@ -109,6 +104,17 @@ class S3Paths(BaseSettings):
         """
         key = self.checkpoint_key(model_name, timestamp, is_final)
         return f"s3://{self.bucket_name}/{self.checkpoints_prefix}/{key}"
+
+
+@lru_cache(maxsize=1)
+def get_paths() -> Paths:
+    """Get the paths configuration."""
+    return Paths()
+
+@lru_cache(maxsize=1)
+def get_s3_paths() -> S3Paths:
+    """Get the S3 paths configuration."""
+    return S3Paths()
 
 
 if __name__ == "__main__":

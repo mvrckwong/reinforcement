@@ -2,13 +2,13 @@
 Loguru logging configuration. Singleton pattern.
 
 Usage:
-    from configs.logging import setup_logging, logger
+    from configs.logging import setup_logging, upload_logs, logger
     
-    # Configure the logging
     setup_logging()
-
-    # Use the logger
     logger.info("Application started")
+    
+    # Upload logs to S3 when done
+    upload_logs()
 """
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ from loguru import logger
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from configs.paths import get_paths
+from configs.paths import get_paths, get_s3_paths
 
 
 class LoggingConfig(BaseSettings):
@@ -68,6 +68,39 @@ def setup_logging(config: LoggingConfig | None = None) -> None:
         compression="zip",
         serialize=config.log_serialize,
     )
+
+
+def upload_logs(verbose: bool = True) -> bool:
+    """
+    Upload local logs to S3.
+    
+    Args:
+        verbose: Print status messages.
+        
+    Returns:
+        True if upload succeeded, False otherwise.
+    """
+    from utils.s3_upload import S3Uploader
+    
+    paths = get_paths()
+    s3_paths = get_s3_paths()
+    
+    if not paths.logs_dir.exists():
+        if verbose:
+            logger.warning(f"Logs directory not found: {paths.logs_dir}")
+        return False
+    
+    uploader = S3Uploader()
+    success = uploader.upload_directory(
+        local_dir=paths.logs_dir,
+        bucket_name=s3_paths.logs_bucket_name,
+        verbose=verbose,
+    )
+    
+    if success and verbose:
+        logger.success(f"Logs uploaded to s3://{s3_paths.logs_bucket_name}/")
+    
+    return success
 
 
 if __name__ == "__main__":
