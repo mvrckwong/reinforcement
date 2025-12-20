@@ -4,7 +4,7 @@ Loguru logging configuration. Singleton pattern.
 Usage:
     from configs.logging import setup_logging, upload_logs, logger
     
-    setup_logging()
+    run_id = setup_logging()
     logger.info("Application started")
     
     # Upload logs to S3 when done
@@ -17,6 +17,7 @@ import sys
 from functools import lru_cache
 from typing import Literal
 
+import pendulum
 from loguru import logger
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,7 +30,6 @@ class LoggingConfig(BaseSettings):
     
     log_level: Literal["TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO")
     log_retention: str = Field(default="7 days")
-    log_rotation: str = Field(default="1 day")
     log_serialize: bool = Field(default=False)
     
     model_config = SettingsConfigDict(
@@ -45,10 +45,21 @@ def _get_config() -> LoggingConfig:
     return LoggingConfig()
 
 
-def setup_logging(config: LoggingConfig | None = None) -> None:
-    """Configure loguru logger. Call once at application startup."""
+def setup_logging(config: LoggingConfig | None = None, run_id: str | None = None) -> str:
+    """Configure loguru logger. Call once at application startup.
+    
+    Args:
+        config: Logging configuration (uses defaults if not provided)
+        run_id: Unique identifier for this run (generated if not provided)
+        
+    Returns:
+        The run_id used for this logging session
+    """
     if config is None:
         config = _get_config()
+    
+    if run_id is None:
+        run_id = pendulum.now().format("YYYYMMDD_HHmmss")
     
     paths = get_paths()
     logger.remove()
@@ -61,13 +72,13 @@ def setup_logging(config: LoggingConfig | None = None) -> None:
     )
     
     logger.add(
-        paths.logs_dir / "{time:YYYY-MM-DD}.log",
+        paths.logs_dir / f"{run_id}.log",
         level=config.log_level,
-        rotation=config.log_rotation,
         retention=config.log_retention,
-        compression="zip",
         serialize=config.log_serialize,
     )
+    
+    return run_id
 
 
 def upload_logs(verbose: bool = True) -> bool:
