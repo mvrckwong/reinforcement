@@ -57,7 +57,11 @@ class LoggingConfig(BaseSettings):
 class LoggingManager:
     """Configures loguru logging for a training run."""
     
-    def setup(self, context: RunContext, config: LoggingConfig | None = None) -> Path:
+    def setup(
+        self, 
+        context: RunContext, 
+        config: LoggingConfig | None = None
+    ) -> Path:
         """Configure loguru logger. Call once at application startup.
         
         Args:
@@ -93,7 +97,10 @@ class LoggingManager:
         return log_path
 
 
-def upload_run_logs(context: RunContext, verbose: bool = True) -> bool:
+def upload_run_logs(
+    context: RunContext, 
+    verbose: bool = True,
+) -> bool:
     """Upload a run's log file to S3.
     
     Args:
@@ -107,26 +114,29 @@ def upload_run_logs(context: RunContext, verbose: bool = True) -> bool:
     
     paths = get_paths()
     s3_paths = get_s3_paths()
-    
+
+    # Get the log file path and check if it exists
     log_file = paths.logs_dir / context.log_filename
     if not log_file.exists():
         if verbose:
             logger.warning(f"Log file not found: {log_file}")
         return False
     
+    # Upload the log file to S3
     uploader = S3Uploader()
     s3_key = context.log_filename
-    success = uploader.upload_file(
+    is_uploaded = uploader.upload_file(
         local_path=log_file,
         bucket_name=s3_paths.logs_bucket_name,
         s3_key=s3_key,
         verbose=verbose,
     )
     
-    if success and verbose:
+    # Log success or failure
+    if is_uploaded and verbose:
         logger.success(f"Log uploaded to s3://{s3_paths.logs_bucket_name}/{s3_key}")
     
-    return success
+    return is_uploaded
 
 
 @lru_cache(maxsize=1)
