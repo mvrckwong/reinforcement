@@ -129,7 +129,7 @@ def upload_run_logs(
         local_path=log_file,
         bucket_name=s3_paths.logs_bucket_name,
         s3_key=s3_key,
-        verbose=is_verbose,
+        is_verbose=is_verbose,
     )
     
     # Log success or failure
@@ -140,16 +140,14 @@ def upload_run_logs(
     
     return is_uploaded
 
-
 @lru_cache(maxsize=1)
 def get_logging_config() -> LoggingConfig:
     """Get the logging configuration."""
     return LoggingConfig()
 
-
 @lru_cache(maxsize=1)
 def get_logging_manager() -> LoggingManager:
-    """Get the logging manager singleton."""
+    """Get the logging manager."""
     return LoggingManager()
 
 
