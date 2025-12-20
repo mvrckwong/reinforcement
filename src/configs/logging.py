@@ -2,43 +2,50 @@
 Loguru logging configuration. Singleton pattern.
 
 Usage:
-    from configs.logging import setup_logging, upload_logs, logger
+    from configs.logging import get_logging_manager, get_logging_config, upload_run_logs, logger
     from configs.run_context import RunContext
     
     context = RunContext(model_name="impala_cartpole")
-    setup_logging(context=context)
+    manager = get_logging_manager()
+    manager.setup(context)
     logger.info("Application started")
     
     # Upload logs to S3 when done
-    upload_logs()
+    upload_run_logs(context)
 """
 
 from __future__ import annotations
 
 import sys
 from functools import lru_cache
-from typing import Literal, TYPE_CHECKING
+from pathlib import Path
+from typing import Literal
 
 from loguru import logger
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from configs.paths import get_paths, get_s3_paths
-
-if TYPE_CHECKING:
-    from configs.run_context import RunContext
-
-# Module-level storage for current run context
-_current_context: RunContext | None = None
+from configs.run_context import RunContext
 
 
 class LoggingConfig(BaseSettings):
     """Logging configuration. All fields can be set via environment variables."""
     
-    log_level: Literal["TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO")
-    log_retention: str = Field(default="7 days")
-    log_serialize: bool = Field(default=False)
+    level: Literal["TRACE", "DEBUG", "INFO", "SUCCESS", "WARNING", "ERROR", "CRITICAL"] = Field(
+        default="INFO",
+        description="Minimum log level to capture."
+    )
+    retention: str = Field(
+        default="7 days",
+        description="How long to retain log files."
+    )
+    serialize: bool = Field(
+        default=False,
+        description="Whether to serialize logs as JSON."
+    )
     
+    # Pydantic configuration
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -47,50 +54,50 @@ class LoggingConfig(BaseSettings):
     )
 
 
-@lru_cache(maxsize=1)
-def _get_config() -> LoggingConfig:
-    return LoggingConfig()
+class LoggingManager:
+    """Configures loguru logging for a training run."""
+    
+    def setup(self, context: RunContext, config: LoggingConfig | None = None) -> Path:
+        """Configure loguru logger. Call once at application startup.
+        
+        Args:
+            context: Run context identifying the training run
+            config: Logging configuration (uses defaults if not provided)
+            
+        Returns:
+            Path to the log file.
+        """
+        if config is None:
+            config = get_logging_config()
+        
+        paths = get_paths()
+        logger.remove()
+        
+        # Create model-specific log directory
+        log_path = paths.logs_dir / context.log_filename
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        logger.add(
+            sys.stderr,
+            level=config.level,
+            colorize=True,
+        )
+        
+        logger.add(
+            log_path,
+            level=config.level,
+            retention=config.retention,
+            serialize=config.serialize,
+        )
+        
+        return log_path
 
 
-def setup_logging(context: RunContext, config: LoggingConfig | None = None) -> None:
-    """Configure loguru logger. Call once at application startup.
+def upload_run_logs(context: RunContext, verbose: bool = True) -> bool:
+    """Upload a run's log file to S3.
     
     Args:
-        context: Run context identifying the training run
-        config: Logging configuration (uses defaults if not provided)
-    """
-    global _current_context
-    _current_context = context
-    
-    if config is None:
-        config = _get_config()
-    
-    paths = get_paths()
-    logger.remove()
-    
-    # Create model-specific log directory
-    log_path = paths.logs_dir / context.log_filename
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    
-    logger.add(
-        sys.stderr,
-        level=config.log_level,
-        colorize=True,
-    )
-    
-    logger.add(
-        log_path,
-        level=config.log_level,
-        retention=config.log_retention,
-        serialize=config.log_serialize,
-    )
-
-
-def upload_logs(verbose: bool = True) -> bool:
-    """
-    Upload current run's log file to S3.
-    
-    Args:
+        context: Run context identifying the training run.
         verbose: Print status messages.
         
     Returns:
@@ -98,22 +105,17 @@ def upload_logs(verbose: bool = True) -> bool:
     """
     from utils.s3_upload import S3Uploader
     
-    if _current_context is None:
-        if verbose:
-            logger.warning("No logging context set. Call setup_logging() first.")
-        return False
-    
     paths = get_paths()
     s3_paths = get_s3_paths()
     
-    log_file = paths.logs_dir / _current_context.log_filename
+    log_file = paths.logs_dir / context.log_filename
     if not log_file.exists():
         if verbose:
             logger.warning(f"Log file not found: {log_file}")
         return False
     
     uploader = S3Uploader()
-    s3_key = _current_context.log_filename
+    s3_key = context.log_filename
     success = uploader.upload_file(
         local_path=log_file,
         bucket_name=s3_paths.logs_bucket_name,
@@ -125,6 +127,18 @@ def upload_logs(verbose: bool = True) -> bool:
         logger.success(f"Log uploaded to s3://{s3_paths.logs_bucket_name}/{s3_key}")
     
     return success
+
+
+@lru_cache(maxsize=1)
+def get_logging_config() -> LoggingConfig:
+    """Get the logging configuration."""
+    return LoggingConfig()
+
+
+@lru_cache(maxsize=1)
+def get_logging_manager() -> LoggingManager:
+    """Get the logging manager singleton."""
+    return LoggingManager()
 
 
 if __name__ == "__main__":
