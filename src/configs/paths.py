@@ -1,11 +1,12 @@
 """
-Paths configuration. Singleton pattern.
+Paths configuration.
 
 Usage:
-    from configs.paths import get_paths
+    from configs.paths import get_paths, get_s3_paths
     
     # Get the paths
     paths = get_paths()
+    s3_paths = get_s3_paths()
 """
 
 from pathlib import Path
