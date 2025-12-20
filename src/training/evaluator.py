@@ -140,3 +140,6 @@ class Evaluator:
         print(f"  Max:    {stats['max_length']:8.0f}")
         print("=" * 60)
 
+
+if __name__ == "__main__":
+    pass

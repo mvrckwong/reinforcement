@@ -67,3 +67,6 @@ def create_algorithm_config(
         .debugging(log_level="ERROR", seed=seed)
     )
 
+
+if __name__ == "__main__":
+    pass

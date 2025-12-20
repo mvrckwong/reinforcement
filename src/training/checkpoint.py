@@ -1,197 +1,183 @@
 """Checkpoint management for training algorithms."""
 
+from __future__ import annotations
+
 import shutil
 import tempfile
 from pathlib import Path
 from os import getenv
+from typing import TYPE_CHECKING
 
 import pendulum
 from ray.rllib.algorithms.algorithm import Algorithm
 from tqdm import tqdm
 
-from configs.paths import Paths
+from configs.paths import get_paths, get_s3_paths
 from utils.s3_upload import S3Uploader
 
-
-CHECKPOINT_PREFIX = "impala_cartpole"
-DEFAULT_BUCKET_NAME = "model"
+if TYPE_CHECKING:
+    from configs.run_context import RunContext
 
 
 class CheckpointManager:
-    """Manages checkpoint saving for training algorithms."""
+    """Manages checkpoint saving. Tries S3 first, falls back to local."""
     
     def __init__(
         self, 
-        use_s3: bool = False, 
-        checkpoint_prefix: str = CHECKPOINT_PREFIX,
-        keep_local_copy: bool = True,
+        context: RunContext,
+        s3_paths=None,
     ):
         """Initialize checkpoint manager.
         
         Args:
-            use_s3: Whether to upload checkpoints to S3
-            checkpoint_prefix: Prefix for checkpoint directories
-            keep_local_copy: Whether to keep local checkpoints (even when using S3)
+            context: Run context identifying the training run
+            s3_paths: S3 path configuration (loaded from env if not provided)
         """
-        self.use_s3 = use_s3
-        self.checkpoint_prefix = checkpoint_prefix
-        self.keep_local_copy = keep_local_copy
-        self.s3_uploader: S3Uploader | None = None
-        self.checkpoint_dir: Path | None = None
+        self.context = context
+        self.s3_paths = s3_paths or get_s3_paths()
         
-        self._setup_storage()
+        # Try to setup S3, track if available
+        self._s3_available = self._check_s3_available()
+        self._local_dir: Path | None = None
+        
+        self._log_storage_mode()
     
-    def _setup_storage(self) -> None:
-        """Setup checkpoint storage (local and optionally S3)."""
-        # Always create local checkpoint directory if keeping local copy
-        if self.keep_local_copy or not self.use_s3:
-            self.checkpoint_dir = (
-                Paths.CHECKPOINTS_DIR 
-                / self.checkpoint_prefix 
-                / pendulum.now().format("YYYYMMDD_HHmmss")
-            )
-            self.checkpoint_dir.mkdir(parents=True, exist_ok=True)
-            print(f"Checkpoints will be saved to: {self.checkpoint_dir}")
+    def _check_s3_available(self) -> bool:
+        """Check if S3 is configured and accessible."""
+        if not getenv('S3_ENDPOINT_URL'):
+            return False
         
-        # Setup S3 if configured
-        if self.use_s3:
-            self.s3_uploader = S3Uploader()
-            print("S3 upload configured - checkpoints will also be uploaded to S3")
+        try:
+            uploader = S3Uploader()
+            # Test bucket access
+            uploader.client.head_bucket(Bucket=self.s3_paths.bucket_name)
+            return True
+        except Exception:
+            return False
+    
+    def _log_storage_mode(self) -> None:
+        """Log which storage mode is being used."""
+        if self._s3_available:
+            print(f"✓ S3 available - checkpoints will be saved to s3://{self.s3_paths.bucket_name}/{self.s3_paths.checkpoints_prefix}")
+        else:
+            print("✗ S3 not available - using local storage")
+            self._setup_local_dir()
+    
+    def _setup_local_dir(self) -> Path:
+        """Setup local checkpoint directory."""
+        if self._local_dir is None:
+            self._local_dir = get_paths().checkpoints_dir / self.context.subpath
+            self._local_dir.mkdir(parents=True, exist_ok=True)
+            print(f"Checkpoints will be saved to: {self._local_dir}")
+        return self._local_dir
     
     def save_checkpoint(
         self, 
         algo: Algorithm, 
         is_final: bool = False,
-        verbose: bool = True,
+        is_verbose: bool = True,
     ) -> bool:
-        """Save algorithm checkpoint.
-        
-        Saves locally (if keep_local_copy is True) and optionally uploads to S3.
+        """Save algorithm checkpoint. Tries S3 first, falls back to local.
         
         Args:
             algo: The algorithm instance to save
             is_final: Whether this is the final checkpoint
-            verbose: Whether to print status messages
+            is_verbose: Whether to print status messages
             
         Returns:
             True if save successful, False otherwise
         """
-        success = True
+        if self._s3_available:
+            success = self._save_to_s3(algo, is_final, is_verbose)
+            if success:
+                return True
+            # S3 failed, fall back to local
+            if is_verbose:
+                tqdm.write("S3 upload failed, falling back to local storage")
+            self._s3_available = False
+            self._setup_local_dir()
         
-        # Save locally first (if configured)
-        if self.checkpoint_dir:
-            success = self._save_locally(algo, verbose) and success
-        
-        # Upload to S3 (if configured)
-        if self.use_s3:
-            success = self._save_to_s3_from_local(algo, is_final, verbose) and success
-        
-        return success
+        return self._save_locally(algo, is_verbose)
     
-    def _save_to_s3_from_local(
+    def _save_to_s3(
         self, 
         algo: Algorithm, 
         is_final: bool = False,
-        verbose: bool = True,
+        is_verbose: bool = True,
     ) -> bool:
-        """Upload checkpoint to S3.
-        
-        If local checkpoint directory exists, uploads it directly.
-        Otherwise, creates a temp directory for the checkpoint.
+        """Save checkpoint directly to S3 using temp directory.
         
         Args:
             algo: The algorithm instance to save
             is_final: Whether this is the final checkpoint
-            verbose: Whether to print status messages
+            is_verbose: Whether to print status messages
             
         Returns:
             True if upload successful, False otherwise
         """
-        if not self.s3_uploader:
-            return False
-        
-        # Use local checkpoint dir if available, otherwise create temp
-        if self.checkpoint_dir:
-            checkpoint_path = str(self.checkpoint_dir)
-            cleanup_temp = False
-        else:
-            prefix = f"{self.checkpoint_prefix}_{'final_' if is_final else ''}"
-            checkpoint_path = tempfile.mkdtemp(prefix=prefix)
-            algo.save(checkpoint_path)
-            cleanup_temp = True
+        suffix = "_final" if is_final else f"_{pendulum.now().format('HHmmss')}"
+        temp_dir = tempfile.mkdtemp(prefix=f"{self.context.model_name}{suffix}_")
         
         try:
-            bucket_name = getenv('S3_BUCKET_NAME', DEFAULT_BUCKET_NAME)
-            timestamp = pendulum.now().format("YYYYMMDD_HHmmss")
-            s3_prefix = f"{self.checkpoint_prefix}/{timestamp}{'_final' if is_final else ''}"
+            # Save to temp directory
+            algo.save(temp_dir)
             
-            success = self.s3_uploader.upload_directory(
-                checkpoint_path, 
-                bucket_name, 
-                s3_prefix
+            # Upload to S3
+            s3_key = f"{self.context.subpath}{suffix}"
+            
+            uploader = S3Uploader()
+            success = uploader.upload_directory(
+                temp_dir,
+                self.s3_paths.bucket_name,
+                f"{self.s3_paths.checkpoints_prefix}/{s3_key}",
             )
             
-            if verbose:
-                if success:
-                    message = "✓ Checkpoint uploaded to S3"
-                    if is_final:
-                        print(message)
-                    else:
-                        tqdm.write(message)
-                else:
-                    message = "✗ S3 upload failed"
-                    if is_final:
-                        print(message)
-                    else:
-                        tqdm.write(message)
+            if is_verbose and success:
+                msg = f"✓ Checkpoint uploaded to S3: {s3_key}"
+                tqdm.write(msg) if not is_final else print(msg)
             
             return success
+        except Exception as e:
+            if is_verbose:
+                tqdm.write(f"✗ S3 save failed: {e}")
+            return False
         finally:
-            if cleanup_temp:
-                shutil.rmtree(checkpoint_path, ignore_errors=True)
+            shutil.rmtree(temp_dir, ignore_errors=True)
     
-    def _save_locally(self, algo: Algorithm, verbose: bool = True) -> bool:
+    def _save_locally(self, algo: Algorithm, is_verbose: bool = True) -> bool:
         """Save algorithm checkpoint locally.
         
         Args:
             algo: The algorithm instance to save
-            verbose: Whether to print status messages
+            is_verbose: Whether to print status messages
             
         Returns:
             True if save successful, False otherwise
         """
-        if not self.checkpoint_dir:
-            return False
-            
+        local_dir = self._setup_local_dir()
+        
         try:
-            checkpoint_path = algo.save(str(self.checkpoint_dir))
-            if verbose:
-                tqdm.write(f"Checkpoint saved at: {checkpoint_path}")
+            checkpoint_path = algo.save(str(local_dir))
+            if is_verbose:
+                tqdm.write(f"✓ Checkpoint saved: {checkpoint_path}")
             return True
         except Exception as e:
-            if verbose:
+            if is_verbose:
                 tqdm.write(f"✗ Failed to save checkpoint: {e}")
             return False
     
     @classmethod
-    def from_env(
-        cls, 
-        checkpoint_prefix: str = CHECKPOINT_PREFIX,
-        keep_local_copy: bool = True,
-    ) -> "CheckpointManager":
+    def from_env(cls, context: RunContext) -> "CheckpointManager":
         """Create CheckpointManager from environment configuration.
         
         Args:
-            checkpoint_prefix: Prefix for checkpoint directories
-            keep_local_copy: Whether to keep local checkpoints (even when using S3)
+            context: Run context identifying the training run
             
         Returns:
             Configured CheckpointManager instance
         """
-        use_s3 = bool(getenv('S3_ENDPOINT_URL'))
-        return cls(
-            use_s3=use_s3, 
-            checkpoint_prefix=checkpoint_prefix,
-            keep_local_copy=keep_local_copy,
-        )
+        return cls(context=context, s3_paths=get_s3_paths())
 
+
+if __name__ == "__main__":
+    pass

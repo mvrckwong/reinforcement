@@ -5,7 +5,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from configs.paths import Paths
+from configs.paths import get_paths
 from training import CheckpointLoader, Evaluator, create_algorithm_config
 from training.config import ENVIRONMENT
 
@@ -80,7 +80,7 @@ def main() -> None:
     args = parse_args()
     
     # Load environment variables
-    load_dotenv(Paths.ENV_FILE)
+    load_dotenv(get_paths().env_file)
     
     # Setup checkpoint loader
     checkpoint_loader = CheckpointLoader.from_env()

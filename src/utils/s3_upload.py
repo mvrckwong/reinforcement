@@ -66,13 +66,13 @@ class S3Uploader:
             use_ssl=self._settings.use_ssl
         )
     
-    def _validate_bucket(self, bucket_name: str, verbose: bool = False) -> bool:
+    def _validate_bucket(self, bucket_name: str, is_verbose: bool = False) -> bool:
         """Validate that the bucket exists and is accessible."""
         try:
             self.client.head_bucket(Bucket=bucket_name)
             return True
         except ClientError as e:
-            if verbose:
+            if is_verbose:
                 error_code = e.response.get('Error', {}).get('Code', '')
                 if error_code == '404':
                     print(f"S3 Error: Bucket '{bucket_name}' does not exist")
@@ -110,7 +110,7 @@ class S3Uploader:
         files_to_upload: list[tuple[Path, str]],
         bucket_name: str,
         max_workers: int,
-        verbose: bool
+        is_verbose: bool
     ) -> bool:
         """Upload files concurrently and handle results."""
         successful = 0
@@ -138,7 +138,7 @@ class S3Uploader:
                     failed_files.append((filename, error))
         
         if failed_files:
-            if verbose:
+            if is_verbose:
                 print(f"S3 upload errors: {len(failed_files)} failed")
                 for fname, err in failed_files[:3]:  # Show first 3 errors
                     print(f"  - {fname}: {err}")
@@ -146,13 +146,63 @@ class S3Uploader:
         
         return True
     
+    def upload_file(
+        self,
+        local_path: Path | str,
+        bucket_name: str,
+        s3_key: str,
+        is_verbose: bool = False,
+    ) -> bool:
+        """
+        Upload a single file to S3/MinIO.
+        
+        Args:
+            local_path: Local file path to upload
+            bucket_name: S3 bucket name
+            s3_key: S3 object key (path in bucket)
+            is_verbose: Print detailed error messages (default: False)
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            local_path = Path(local_path)
+            
+            if not local_path.exists():
+                if is_verbose:
+                    print(f"✗ Error: File does not exist: {local_path}")
+                return False
+            
+            if not self._validate_bucket(bucket_name, is_verbose):
+                return False
+            
+            _, success, error = self._upload_single_file(
+                self.client, local_path, bucket_name, s3_key
+            )
+            
+            if not success and is_verbose:
+                print(f"S3 upload error: {error}")
+            
+            return success
+            
+        except ClientError as e:
+            if is_verbose:
+                error_code = e.response.get('Error', {}).get('Code', '')
+                error_msg = e.response.get('Error', {}).get('Message', str(e))
+                print(f"S3 Error ({error_code}): {error_msg}")
+            return False
+        except Exception as e:
+            if is_verbose:
+                print(f"S3 upload error: {e}")
+            return False
+
     def upload_directory(
         self,
         local_dir: Path | str,
         bucket_name: str,
         s3_prefix: Optional[str] = None,
         max_workers: int = 4,
-        verbose: bool = False,
+        is_verbose: bool = False,
     ) -> bool:
         """
         Upload a directory and all its contents to S3/MinIO with concurrent uploads.
@@ -162,7 +212,7 @@ class S3Uploader:
             bucket_name: S3 bucket name
             s3_prefix: Optional prefix path in S3 (e.g., 'impala_cartpole/20241207_120000')
             max_workers: Number of concurrent upload threads (default: 4)
-            verbose: Print detailed error messages (default: False)
+            is_verbose: Print detailed error messages (default: False)
         
         Returns:
             True if successful, False otherwise
@@ -171,19 +221,19 @@ class S3Uploader:
             local_dir = Path(local_dir)
             
             if not local_dir.exists():
-                if verbose:
+                if is_verbose:
                     print(f"✗ Error: Directory does not exist: {local_dir}")
                 return False
             
             # Validate bucket exists
-            if not self._validate_bucket(bucket_name, verbose):
+            if not self._validate_bucket(bucket_name, is_verbose):
                 return False
             
             # Collect all files to upload
             files_to_upload = self._collect_files(local_dir, s3_prefix)
             
             if not files_to_upload:
-                if verbose:
+                if is_verbose:
                     print(f"No files found in {local_dir}")
                 return False
             
@@ -192,15 +242,15 @@ class S3Uploader:
                 files_to_upload, 
                 bucket_name, 
                 max_workers, 
-                verbose
+                is_verbose
             )
             
         except ValueError as e:
-            if verbose:
+            if is_verbose:
                 print(f"S3 config error: {e}")
             return False
         except ClientError as e:
-            if verbose:
+            if is_verbose:
                 error_code = e.response.get('Error', {}).get('Code', '')
                 error_msg = e.response.get('Error', {}).get('Message', str(e))
                 
@@ -210,7 +260,7 @@ class S3Uploader:
                     print(f"S3 Error ({error_code}): {error_msg}")
             return False
         except Exception as e:
-            if verbose:
+            if is_verbose:
                 print(f"S3 upload error: {e}")
             return False
 

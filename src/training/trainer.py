@@ -50,5 +50,8 @@ class Trainer:
     
     def _save_final_checkpoint(self) -> None:
         """Save the final checkpoint after training completes."""
-        self.checkpoint_manager.save_checkpoint(self.algo, is_final=True, verbose=True)
+        self.checkpoint_manager.save_checkpoint(self.algo, is_final=True, is_verbose=True)
 
+
+if __name__ == "__main__":
+    pass

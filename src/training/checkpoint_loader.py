@@ -8,26 +8,32 @@ import pendulum
 from ray.rllib.algorithms.algorithm import Algorithm
 from ray.rllib.algorithms.algorithm_config import AlgorithmConfig
 
-from configs.paths import Paths
+from configs.paths import get_paths, get_s3_paths, S3Paths
 from utils.s3_upload import S3Uploader
 
 
 CHECKPOINT_PREFIX = "impala_cartpole"
-DEFAULT_BUCKET_NAME = "model"
 
 
 class CheckpointLoader:
     """Handles loading checkpoints for evaluation."""
     
-    def __init__(self, use_s3: bool = False, checkpoint_prefix: str = CHECKPOINT_PREFIX):
+    def __init__(
+        self, 
+        use_s3: bool = False, 
+        checkpoint_prefix: str = CHECKPOINT_PREFIX,
+        s3_paths: S3Paths | None = None,
+    ):
         """Initialize checkpoint loader.
         
         Args:
             use_s3: Whether to load from S3
             checkpoint_prefix: Prefix for checkpoint directories
+            s3_paths: S3 path configuration (loaded from env if not provided)
         """
         self.use_s3 = use_s3
         self.checkpoint_prefix = checkpoint_prefix
+        self.s3_paths = s3_paths or get_s3_paths()
         self.s3_uploader: S3Uploader | None = None
         
         if self.use_s3:
@@ -84,7 +90,7 @@ class CheckpointLoader:
         Raises:
             FileNotFoundError: If no checkpoints found
         """
-        checkpoint_base = Paths.CHECKPOINTS_DIR / self.checkpoint_prefix
+        checkpoint_base = get_paths().checkpoints_dir / self.checkpoint_prefix
         
         if not checkpoint_base.exists():
             raise FileNotFoundError(
@@ -155,7 +161,7 @@ class CheckpointLoader:
         Returns:
             List of checkpoint directory paths, sorted by modification time (newest first)
         """
-        checkpoint_base = Paths.CHECKPOINTS_DIR / self.checkpoint_prefix
+        checkpoint_base = get_paths().checkpoints_dir / self.checkpoint_prefix
         
         if not checkpoint_base.exists():
             return []
@@ -183,5 +189,13 @@ class CheckpointLoader:
             Configured CheckpointLoader instance
         """
         use_s3 = bool(getenv('S3_ENDPOINT_URL'))
-        return cls(use_s3=use_s3, checkpoint_prefix=checkpoint_prefix)
+        s3_paths = get_s3_paths()
+        return cls(
+            use_s3=use_s3, 
+            checkpoint_prefix=checkpoint_prefix,
+            s3_paths=s3_paths,
+        )
 
+
+if __name__ == "__main__":
+    pass

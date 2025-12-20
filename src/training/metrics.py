@@ -1,7 +1,6 @@
 """Metrics extraction and reporting utilities."""
 
 from typing import Any, Mapping
-
 from tqdm import tqdm
 
 
@@ -50,7 +49,11 @@ def print_training_metrics(
         "episode_return_mean", 
         default=extract_metric(result, "episode_reward_mean", 0.0)
     )
-    length = extract_metric(result, "episode_len_mean", default=0.0)
+    length = extract_metric(
+        result, 
+        "episode_len_mean", 
+        default=0.0
+    )
     steps = extract_metric(
         result, 
         "num_env_steps_sampled", 
@@ -65,3 +68,6 @@ def print_training_metrics(
         f"Steps: {steps:8.0f}"
     )
 
+
+if __name__ == "__main__":
+    pass

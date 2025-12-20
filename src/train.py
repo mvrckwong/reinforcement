@@ -2,7 +2,9 @@
 
 from dotenv import load_dotenv
 
-from configs.paths import Paths
+from configs.paths import get_paths
+from configs.logging import get_logging_manager, upload_run_logs, logger
+from configs.run_context import RunContext
 from training import CheckpointManager, Trainer, create_algorithm_config
 from training.config import ENVIRONMENT
 
@@ -10,18 +12,23 @@ from training.config import ENVIRONMENT
 # Training hyperparameters
 NUM_ITERATIONS = 100
 CHECKPOINT_INTERVAL = 10
+MODEL_NAME = "impala_cartpole"
 
 
 def main() -> None:
     """Main training function."""
     # Load environment variables
-    load_dotenv(Paths.ENV_FILE)
+    load_dotenv(get_paths().env_file)
     
-    # Setup checkpoint management
-    checkpoint_manager = CheckpointManager.from_env()
+    # Single source of truth for run identity
+    context = RunContext(model_name=MODEL_NAME)
+    
+    # Setup logging and checkpoint management with shared context
+    get_logging_manager().setup(context)
+    checkpoint_manager = CheckpointManager.from_env(context=context)
     
     # Create and build algorithm
-    print(f"Training IMPALA on {ENVIRONMENT}...")
+    logger.info(f"Training IMPALA on {ENVIRONMENT}...")
     config = create_algorithm_config()
     algo = config.build()
     
@@ -34,6 +41,10 @@ def main() -> None:
     )
     
     trainer.train()
+    logger.success("Training completed!")
+    
+    # Upload logs to S3
+    upload_run_logs(context)
 
 
 if __name__ == "__main__":
