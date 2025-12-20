@@ -76,35 +76,6 @@ class S3Paths(BaseSettings):
         case_sensitive=True,
         extra='ignore'
     )
-    
-    def checkpoint_key(self, model_name: str, timestamp: str, is_final: bool = False) -> str:
-        """Build S3 key for a checkpoint.
-        
-        Args:
-            model_name: Name/prefix of the model
-            timestamp: Timestamp string (e.g., '20241216_120000')
-            is_final: Whether this is the final checkpoint
-            
-        Returns:
-            S3 key like 'checkpoints/impala_cartpole/20241216_120000'
-        """
-        suffix = '_final' if is_final else ''
-        return f"{model_name}/{timestamp}{suffix}"
-    
-    def checkpoint_uri(self, model_name: str, timestamp: str, is_final: bool = False) -> str:
-        """Build full S3 URI for a checkpoint.
-        
-        Args:
-            model_name: Name/prefix of the model
-            timestamp: Timestamp string
-            is_final: Whether this is the final checkpoint
-            
-        Returns:
-            S3 URI like 's3://model/checkpoints/impala_cartpole/20241216_120000'
-        """
-        key = self.checkpoint_key(model_name, timestamp, is_final)
-        return f"s3://{self.bucket_name}/{self.checkpoints_prefix}/{key}"
-
 
 @lru_cache(maxsize=1)
 def get_paths() -> Paths:
