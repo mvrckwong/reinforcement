@@ -3,7 +3,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class S3Settings(BaseSettings):
-    """S3/MinIO configuration settings loaded from environment variables."""
+    """S3/MinIO configuration settings."""
     
     endpoint_url: str = Field(
         ..., 
@@ -21,7 +21,7 @@ class S3Settings(BaseSettings):
         description="S3/MinIO secret access key"
     )
     region: str = Field(
-        default='us-east-1', 
+        default='local', 
         alias='S3_REGION', 
         description="S3/MinIO region (e.g., us-east-1)"
     )
