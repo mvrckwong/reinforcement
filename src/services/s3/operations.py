@@ -1,17 +1,61 @@
 """
-Pure S3 upload operations.
+Pure S3 upload and delete operations.
 
 Usage:
-    from services.s3 import get_s3_client, upload_file, collect_upload_tasks
+    from services.s3 import get_s3_client, upload_file, delete_prefix
     
     client = get_s3_client()
     success, error = upload_file(client, path, bucket, key)
+    delete_prefix(client, bucket, "model/run_id/checkpoints/latest")
 """
 
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import TYPE_CHECKING
 
 from services.s3.client import S3ClientProtocol
+
+if TYPE_CHECKING:
+    from botocore.client import BaseClient
+
+
+def delete_prefix(
+    client: "BaseClient",
+    bucket_name: str,
+    prefix: str,
+) -> tuple[int, str]:
+    """Delete all objects under an S3 prefix.
+    
+    Args:
+        client: S3 client instance (needs list/delete permissions).
+        bucket_name: S3 bucket name.
+        prefix: S3 prefix to delete (e.g., 'model/run_id/checkpoints/latest').
+        
+    Returns:
+        Tuple of (deleted_count, error_message).
+    """
+    try:
+        # List all objects under prefix
+        paginator = client.get_paginator('list_objects_v2')
+        pages = paginator.paginate(Bucket=bucket_name, Prefix=prefix)
+        
+        deleted_count = 0
+        for page in pages:
+            objects = page.get('Contents', [])
+            if not objects:
+                continue
+            
+            # Delete in batches of 1000 (S3 limit)
+            delete_keys = [{'Key': obj['Key']} for obj in objects]
+            client.delete_objects(
+                Bucket=bucket_name,
+                Delete={'Objects': delete_keys}
+            )
+            deleted_count += len(delete_keys)
+        
+        return (deleted_count, "")
+    except Exception as e:
+        return (0, str(e))
 
 
 def validate_local_file(path: Path) -> tuple[bool, str]:

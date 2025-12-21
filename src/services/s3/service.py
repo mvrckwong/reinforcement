@@ -14,6 +14,7 @@ from typing import Optional
 
 from services.s3.client import S3ClientProtocol, validate_bucket, get_s3_client
 from services.s3.operations import (
+    delete_prefix,
     validate_local_file,
     validate_local_directory,
     collect_upload_tasks,
@@ -23,7 +24,7 @@ from services.s3.operations import (
 
 
 class S3Uploader:
-    """Thin orchestrator for S3 upload operations."""
+    """Orchestrator for S3 upload operations."""
     
     def __init__(self, client: S3ClientProtocol):
         """Initialize the S3 uploader.
@@ -76,6 +77,41 @@ class S3Uploader:
         
         return success
     
+    def delete_prefix(
+        self,
+        bucket_name: str,
+        prefix: str,
+        is_verbose: bool = False,
+    ) -> bool:
+        """Delete all objects under an S3 prefix.
+        
+        Args:
+            bucket_name: S3 bucket name.
+            prefix: S3 prefix to delete.
+            is_verbose: Print detailed messages.
+            
+        Returns:
+            True if deletion successful, False otherwise.
+        """
+        if not validate_bucket(self._client, bucket_name):
+            if is_verbose:
+                print(f"S3 Error: Cannot access bucket '{bucket_name}'")
+            return False
+        
+        deleted_count, error = delete_prefix(
+            self._client, bucket_name, prefix
+        )
+        
+        if error:
+            if is_verbose:
+                print(f"S3 delete error: {error}")
+            return False
+        
+        if is_verbose and deleted_count > 0:
+            print(f"✓ Deleted {deleted_count} objects from s3://{bucket_name}/{prefix}")
+        
+        return True
+
     def upload_directory(
         self,
         local_dir: Path | str,
@@ -83,6 +119,7 @@ class S3Uploader:
         s3_prefix: Optional[str] = None,
         max_workers: int = 4,
         is_verbose: bool = False,
+        clean_first: bool = False,
     ) -> bool:
         """Upload a directory with concurrent uploads.
         
@@ -92,6 +129,7 @@ class S3Uploader:
             s3_prefix: Optional prefix path in S3.
             max_workers: Number of concurrent upload threads.
             is_verbose: Print detailed error messages.
+            clean_first: Delete existing objects under prefix before upload.
             
         Returns:
             True if all uploads successful, False otherwise.
@@ -108,6 +146,10 @@ class S3Uploader:
             if is_verbose:
                 print(f"S3 Error: Cannot access bucket '{bucket_name}'")
             return False
+        
+        # Clean existing objects if requested
+        if clean_first and s3_prefix:
+            self.delete_prefix(bucket_name, s3_prefix, is_verbose=False)
         
         tasks = collect_upload_tasks(local_dir, s3_prefix)
         

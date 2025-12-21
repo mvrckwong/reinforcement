@@ -54,19 +54,20 @@ class S3Paths(BaseSettings):
     Note: These are path structures only, not connection settings.
     For S3 credentials/endpoint, see configs.storage.S3Settings
     """
-    general_bucket_name: str = Field(
-        default='general', 
-        alias='S3_GENERAL_BUCKET_NAME',
-        description="S3 bucket for general files"
+    general_bucket: str = Field(
+        default='general',
+        description="S3 bucket for general files (e.g. config files, models, etc.)"
     )
-    checkpoints_bucket_name: str = Field(
-        default='checkpoints', 
-        alias='S3_CHECKPOINTS_BUCKET_NAME',
-        description="S3 bucket for checkpoints"
+    artifacts_bucket: str = Field(
+        default='artifacts',
+        description="S3 bucket for all artifacts (checkpoints, logs, metadata)"
     )
-    logs_bucket_name: str = Field(
-        default='logging', 
-        alias='S3_LOGS_BUCKET_NAME',
+    checkpoints_bucket: str = Field(
+        default='checkpoints',
+        description="S3 bucket for general checkpoints"
+    )
+    logs_bucket: str = Field(
+        default='logging',
         description="S3 bucket for logs"
     )
     

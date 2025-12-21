@@ -81,8 +81,8 @@ class LoggingManager:
         paths = get_paths()
         logger.remove()
         
-        # Create model-specific log directory
-        log_path = paths.logs_dir / context.log_filename
+        # Create model-specific log directory (local fallback)
+        log_path = paths.logs_dir / context.local_log_filename
         log_path.parent.mkdir(parents=True, exist_ok=True)
         
         logger.add(
@@ -107,6 +107,8 @@ def upload_run_logs(
 ) -> bool:
     """Upload a run's log file to S3.
     
+    Uploads to: s3://{bucket}/{model_name}/{run_id}/logs/training.log
+    
     Args:
         context: Run context identifying the training run.
         is_verbose: Print status messages.
@@ -120,34 +122,35 @@ def upload_run_logs(
     s3_paths = get_s3_paths()
 
     # Get the log file path and check if it exists
-    log_file = paths.logs_dir / context.log_filename
+    log_file = paths.logs_dir / context.local_log_filename
     if not log_file.exists():
         if is_verbose:
             logger.warning(f"Log file not found: {log_file}")
         return False
     
-    # Upload the log file to S3
+    # Upload the log file to S3 using new unified path structure
     uploader = get_s3_uploader()
-    s3_key = context.log_filename
     is_uploaded = uploader.upload_file(
         local_path=log_file,
-        bucket_name=s3_paths.logs_bucket_name,
-        s3_key=s3_key,
+        bucket_name=s3_paths.artifacts_bucket,
+        s3_key=context.log_file_key,
         is_verbose=is_verbose,
     )
     
     # Log success or failure
     if is_uploaded and is_verbose:
         logger.success(
-            f"Log uploaded to s3://{s3_paths.logs_bucket_name}/{s3_key}"
+            f"Log uploaded to s3://{s3_paths.artifacts_bucket}/{context.log_file_key}"
         )
     
     return is_uploaded
+
 
 @lru_cache(maxsize=1)
 def get_logging_config() -> LoggingConfig:
     """Get the logging configuration."""
     return LoggingConfig()
+
 
 @lru_cache(maxsize=1)
 def get_logging_manager() -> LoggingManager:
