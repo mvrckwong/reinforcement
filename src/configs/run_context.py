@@ -3,10 +3,6 @@ Run context for correlating training artifacts.
 
 Usage:
     from configs.run_context import RunContext
-    
-    context = RunContext(model_name="impala_cartpole")
-    # context.run_id is auto-generated timestamp
-    # context.run_prefix -> "impala_cartpole/20251220_193700"
 """
 
 import pendulum
