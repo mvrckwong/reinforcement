@@ -7,18 +7,6 @@ Usage:
     context = RunContext(model_name="impala_cartpole")
     # context.run_id is auto-generated timestamp
     # context.run_prefix -> "impala_cartpole/20251220_193700"
-    
-S3 Structure:
-    artifacts/
-    └── {model_name}/
-        └── {run_id}/
-            ├── checkpoints/
-            │   ├── best/
-            │   ├── latest/
-            │   └── final/
-            ├── logs/
-            │   └── training.log
-            └── metadata.json
 """
 
 import pendulum

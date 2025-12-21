@@ -1,5 +1,5 @@
 """
-Loguru logging configuration. Singleton pattern.
+Loguru logging configuration.
 
 Usage:
     from configs.logging import get_logging_manager, get_logging_config, upload_run_logs, logger
