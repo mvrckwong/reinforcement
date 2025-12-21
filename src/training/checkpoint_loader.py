@@ -9,7 +9,6 @@ from ray.rllib.algorithms.algorithm import Algorithm
 from ray.rllib.algorithms.algorithm_config import AlgorithmConfig
 
 from configs.paths import get_paths, get_s3_paths, S3Paths
-from utils.s3_upload import S3Uploader
 
 
 CHECKPOINT_PREFIX = "impala_cartpole"
@@ -34,10 +33,6 @@ class CheckpointLoader:
         self.use_s3 = use_s3
         self.checkpoint_prefix = checkpoint_prefix
         self.s3_paths = s3_paths or get_s3_paths()
-        self.s3_uploader: S3Uploader | None = None
-        
-        if self.use_s3:
-            self.s3_uploader = S3Uploader()
     
     def load_latest_checkpoint(
         self, 

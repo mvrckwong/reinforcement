@@ -114,7 +114,7 @@ def upload_run_logs(
     Returns:
         True if upload succeeded, False otherwise.
     """
-    from utils.s3_upload import S3Uploader
+    from services.s3 import get_s3_uploader
     
     paths = get_paths()
     s3_paths = get_s3_paths()
@@ -127,7 +127,7 @@ def upload_run_logs(
         return False
     
     # Upload the log file to S3
-    uploader = S3Uploader()
+    uploader = get_s3_uploader()
     s3_key = context.log_filename
     is_uploaded = uploader.upload_file(
         local_path=log_file,

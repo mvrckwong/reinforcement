@@ -13,7 +13,7 @@ from ray.rllib.algorithms.algorithm import Algorithm
 from tqdm import tqdm
 
 from configs.paths import get_paths, get_s3_paths
-from utils.s3_upload import S3Uploader
+from services.s3 import get_s3_uploader
 
 if TYPE_CHECKING:
     from configs.run_context import RunContext
@@ -48,7 +48,7 @@ class CheckpointManager:
             return False
         
         try:
-            uploader = S3Uploader()
+            uploader = get_s3_uploader()
             # Test bucket access
             uploader.client.head_bucket(Bucket=self.s3_paths.checkpoints_bucket_name)
             return True
@@ -125,7 +125,7 @@ class CheckpointManager:
             # Upload to S3
             s3_key = f"{self.context.subpath}{suffix}"
             
-            uploader = S3Uploader()
+            uploader = get_s3_uploader()
             success = uploader.upload_directory(
                 temp_dir,
                 self.s3_paths.checkpoints_bucket_name,
