@@ -5,10 +5,26 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class S3Settings(BaseSettings):
     """S3/MinIO configuration settings loaded from environment variables."""
     
-    endpoint_url: str = Field(..., alias='S3_ENDPOINT_URL', description="S3/MinIO endpoint URL (e.g., https://localhost:9000)")
-    access_key_id: str = Field(..., alias='S3_ACCESS_KEY_ID', description="S3 access key ID")
-    secret_access_key: str = Field(..., alias='S3_SECRET_ACCESS_KEY', description="S3 secret access key")
-    region: str = Field(default='us-east-1', alias='S3_REGION', description="AWS region")
+    endpoint_url: str = Field(
+        ..., 
+        alias='S3_ENDPOINT_URL', 
+        description="S3/MinIO endpoint URL (e.g., https://localhost:9000)"
+    )
+    access_key_id: str = Field(
+        ..., 
+        alias='S3_ACCESS_KEY_ID', 
+        description="S3/MinIO access key ID"
+    )
+    secret_access_key: str = Field(
+        ..., 
+        alias='S3_SECRET_ACCESS_KEY', 
+        description="S3/MinIO secret access key"
+    )
+    region: str = Field(
+        default='us-east-1', 
+        alias='S3_REGION', 
+        description="S3/MinIO region (e.g., us-east-1)"
+    )
 
     model_config = SettingsConfigDict(
         env_file='.env',
