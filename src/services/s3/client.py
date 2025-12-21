@@ -1,15 +1,14 @@
 """
-S3 client creation and validation.
+S3 client creation and core operations.
 
 Usage:
-    from services.s3 import get_s3_client, validate_bucket
+    from services.s3 import get_s3_client
     
     client = get_s3_client()
-    if validate_bucket(client, "my-bucket"):
-        print("Bucket is accessible")
 """
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Protocol
 
 from boto3 import client as boto3_client
@@ -52,16 +51,14 @@ def create_s3_client(settings: S3Settings | None = None) -> BaseClient:
     )
 
 
+@lru_cache(maxsize=1)
+def get_s3_client() -> BaseClient:
+    """Get singleton S3 client instance."""
+    return create_s3_client()
+
+
 def validate_bucket(client: S3ClientProtocol, bucket_name: str) -> bool:
-    """Check if bucket exists and is accessible.
-    
-    Args:
-        client: S3 client instance.
-        bucket_name: Name of the bucket to validate.
-        
-    Returns:
-        True if bucket is accessible, False otherwise.
-    """
+    """Check if bucket exists and is accessible."""
     try:
         client.head_bucket(Bucket=bucket_name)
         return True
@@ -69,16 +66,51 @@ def validate_bucket(client: S3ClientProtocol, bucket_name: str) -> bool:
         return False
 
 
-@lru_cache(maxsize=1)
-def get_s3_client() -> BaseClient:
-    """Get singleton S3 client instance.
+def upload_file(
+    client: S3ClientProtocol,
+    local_path: Path,
+    bucket_name: str,
+    s3_key: str,
+) -> bool:
+    """Upload single file. Returns True on success."""
+    try:
+        client.upload_file(str(local_path), bucket_name, s3_key)
+        return True
+    except Exception:
+        return False
+
+
+def delete_prefix(
+    client: BaseClient,
+    bucket_name: str,
+    prefix: str,
+) -> tuple[int, str]:
+    """Delete all objects under an S3 prefix.
     
     Returns:
-        Cached S3 client instance.
+        Tuple of (deleted_count, error_message).
     """
-    return create_s3_client()
+    try:
+        paginator = client.get_paginator('list_objects_v2')
+        pages = paginator.paginate(Bucket=bucket_name, Prefix=prefix)
+        
+        deleted_count = 0
+        for page in pages:
+            objects = page.get('Contents', [])
+            if not objects:
+                continue
+            
+            delete_keys = [{'Key': obj['Key']} for obj in objects]
+            client.delete_objects(
+                Bucket=bucket_name,
+                Delete={'Objects': delete_keys}
+            )
+            deleted_count += len(delete_keys)
+        
+        return (deleted_count, "")
+    except Exception as e:
+        return (0, str(e))
 
 
 if __name__ == "__main__":
     pass
-

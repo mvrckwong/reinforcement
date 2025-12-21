@@ -6,37 +6,33 @@ Usage:
     
     uploader = get_s3_uploader()
     uploader.upload_file(local_path, bucket, s3_key)
+    uploader.upload_directory(local_dir, bucket, s3_prefix)
 """
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
 
-from services.s3.client import S3ClientProtocol, validate_bucket, get_s3_client
-from services.s3.operations import (
+from services.s3.client import (
+    S3ClientProtocol,
+    validate_bucket,
+    get_s3_client,
     delete_prefix,
-    validate_file,
-    validate_dir,
-    collect_upload_tasks,
     upload_file,
-    upload_files_concurrently,
 )
 
 
 class S3Uploader:
-    """Orchestrator for S3 upload operations."""
+    """Orchestrator for S3 upload operations with validation and logging."""
     
     def __init__(self, client: S3ClientProtocol):
-        """Initialize the S3 uploader.
-        
-        Args:
-            client: Injected S3 client (DIP - depend on abstraction).
-        """
+        """Initialize with injected S3 client (DIP)."""
         self._client = client
     
     @property
     def client(self) -> S3ClientProtocol:
-        """Expose client for direct operations (e.g., head_bucket)."""
+        """Expose client for direct operations (e.g., lifecycle rules)."""
         return self._client
     
     def upload_file(
@@ -46,20 +42,10 @@ class S3Uploader:
         s3_key: str,
         is_verbose: bool = False,
     ) -> bool:
-        """Upload a single file to S3/MinIO.
-        
-        Args:
-            local_path: Local file path to upload.
-            bucket_name: S3 bucket name.
-            s3_key: S3 object key (path in bucket).
-            is_verbose: Print detailed error messages.
-            
-        Returns:
-            True if successful, False otherwise.
-        """
+        """Upload a single file to S3/MinIO with validation."""
         local_path = Path(local_path)
         
-        if not validate_file(local_path):
+        if not (local_path.exists() and local_path.is_file()):
             if is_verbose:
                 print(f"✗ Invalid file path: {local_path}")
             return False
@@ -82,24 +68,13 @@ class S3Uploader:
         prefix: str,
         is_verbose: bool = False,
     ) -> bool:
-        """Delete all objects under an S3 prefix.
-        
-        Args:
-            bucket_name: S3 bucket name.
-            prefix: S3 prefix to delete.
-            is_verbose: Print detailed messages.
-            
-        Returns:
-            True if deletion successful, False otherwise.
-        """
+        """Delete all objects under an S3 prefix."""
         if not validate_bucket(self._client, bucket_name):
             if is_verbose:
                 print(f"S3 Error: Cannot access bucket '{bucket_name}'")
             return False
         
-        deleted_count, error = delete_prefix(
-            self._client, bucket_name, prefix
-        )
+        deleted_count, error = delete_prefix(self._client, bucket_name, prefix)
         
         if error:
             if is_verbose:
@@ -120,22 +95,10 @@ class S3Uploader:
         is_verbose: bool = False,
         clean_first: bool = False,
     ) -> bool:
-        """Upload a directory with concurrent uploads.
-        
-        Args:
-            local_dir: Local directory path to upload.
-            bucket_name: S3 bucket name.
-            s3_prefix: Optional prefix path in S3.
-            max_workers: Number of concurrent upload threads.
-            is_verbose: Print detailed error messages.
-            clean_first: Delete existing objects under prefix before upload.
-            
-        Returns:
-            True if all uploads successful, False otherwise.
-        """
+        """Upload a directory with concurrent uploads."""
         local_dir = Path(local_dir)
         
-        if not validate_dir(local_dir):
+        if not (local_dir.exists() and local_dir.is_dir()):
             if is_verbose:
                 print(f"✗ Invalid directory path: {local_dir}")
             return False
@@ -145,22 +108,34 @@ class S3Uploader:
                 print(f"S3 Error: Cannot access bucket '{bucket_name}'")
             return False
         
-        # Clean existing objects if requested
         if clean_first and s3_prefix:
             self.delete_prefix(bucket_name, s3_prefix, is_verbose=False)
         
-        tasks = collect_upload_tasks(local_dir, s3_prefix)
+        # Collect upload tasks (file path → S3 key)
+        tasks = []
+        for file_path in local_dir.rglob('*'):
+            if file_path.is_file():
+                relative = file_path.relative_to(local_dir)
+                key = f"{s3_prefix}/{relative}" if s3_prefix else str(relative)
+                tasks.append((file_path, key.replace('\\', '/')))
         
         if not tasks:
             if is_verbose:
                 print(f"No files found in {local_dir}")
             return False
         
-        results = upload_files_concurrently(
-            self._client, tasks, bucket_name, max_workers
-        )
-        
-        failed = [f for f, s in results if not s]
+        # Concurrent uploads
+        failed = []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(
+                    upload_file, self._client, path, bucket_name, key
+                ): path.name
+                for path, key in tasks
+            }
+            for future in as_completed(futures):
+                if not future.result():
+                    failed.append(futures[future])
         
         if failed and is_verbose:
             print(f"S3 upload errors: {len(failed)} failed")
@@ -172,14 +147,9 @@ class S3Uploader:
 
 @lru_cache(maxsize=1)
 def get_s3_uploader() -> S3Uploader:
-    """Get singleton S3 uploader instance.
-    
-    Returns:
-        Cached S3Uploader instance with singleton client.
-    """
+    """Get singleton S3 uploader instance."""
     return S3Uploader(get_s3_client())
 
 
 if __name__ == "__main__":
     pass
-

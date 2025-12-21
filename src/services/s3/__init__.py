@@ -12,21 +12,8 @@ Usage:
     configure_lifecycle_rules(uploader.client, bucket, is_verbose=True)
 """
 
-from services.s3.client import (
-    S3ClientProtocol,
-    create_s3_client,
-    get_s3_client,
-    validate_bucket,
-)
-from services.s3.operations import (
-    delete_prefix,
-    validate_file,
-    validate_dir,
-    collect_upload_tasks,
-    upload_file,
-    upload_files_concurrently,
-)
-from services.s3.service import get_s3_uploader
+from services.s3.client import S3ClientProtocol, get_s3_client, validate_bucket
+from services.s3.service import S3Uploader, get_s3_uploader
 from services.s3.lifecycle import (
     DEFAULT_LIFECYCLE_RULES,
     configure_lifecycle_rules,
@@ -35,21 +22,13 @@ from services.s3.lifecycle import (
 )
 
 __all__ = [
-    # Client
+    # Client (for type hints and direct access)
     "S3ClientProtocol",
-    "create_s3_client",
     "get_s3_client",
     "validate_bucket",
-
-    # Operations
-    "delete_prefix",
-    "validate_file",
-    "validate_dir",
-    "collect_upload_tasks",
-    "upload_file",
-    "upload_files_concurrently",
-
-    # Service
+    
+    # Service (main entry point)
+    "S3Uploader",
     "get_s3_uploader",
     
     # Lifecycle

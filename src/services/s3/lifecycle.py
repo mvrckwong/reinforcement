@@ -154,4 +154,3 @@ def delete_lifecycle_rules(
 
 if __name__ == "__main__":
     pass
-
