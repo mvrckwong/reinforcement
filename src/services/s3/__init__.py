@@ -20,16 +20,13 @@ from services.s3.client import (
 )
 from services.s3.operations import (
     delete_prefix,
-    validate_local_file,
-    validate_local_directory,
+    validate_file,
+    validate_dir,
     collect_upload_tasks,
     upload_file,
     upload_files_concurrently,
 )
-from services.s3.service import (
-    S3Uploader,
-    get_s3_uploader,
-)
+from services.s3.service import get_s3_uploader
 from services.s3.lifecycle import (
     DEFAULT_LIFECYCLE_RULES,
     configure_lifecycle_rules,
@@ -43,16 +40,18 @@ __all__ = [
     "create_s3_client",
     "get_s3_client",
     "validate_bucket",
+
     # Operations
     "delete_prefix",
-    "validate_local_file",
-    "validate_local_directory",
+    "validate_file",
+    "validate_dir",
     "collect_upload_tasks",
     "upload_file",
     "upload_files_concurrently",
+
     # Service
-    "S3Uploader",
     "get_s3_uploader",
+    
     # Lifecycle
     "DEFAULT_LIFECYCLE_RULES",
     "configure_lifecycle_rules",

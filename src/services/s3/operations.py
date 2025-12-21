@@ -5,7 +5,7 @@ Usage:
     from services.s3 import get_s3_client, upload_file, delete_prefix
     
     client = get_s3_client()
-    success, error = upload_file(client, path, bucket, key)
+    success = upload_file(client, path, bucket, key)
     delete_prefix(client, bucket, "model/run_id/checkpoints/latest")
 """
 
@@ -58,36 +58,14 @@ def delete_prefix(
         return (0, str(e))
 
 
-def validate_local_file(path: Path) -> tuple[bool, str]:
-    """Validate local file exists.
-    
-    Args:
-        path: Path to validate.
-        
-    Returns:
-        Tuple of (valid, error_message).
-    """
-    if not path.exists():
-        return (False, f"File does not exist: {path}")
-    if not path.is_file():
-        return (False, f"Path is not a file: {path}")
-    return (True, "")
+def validate_file(path: Path) -> bool:
+    """Validate path exists and is a file."""
+    return path.exists() and path.is_file()
 
 
-def validate_local_directory(path: Path) -> tuple[bool, str]:
-    """Validate local directory exists.
-    
-    Args:
-        path: Path to validate.
-        
-    Returns:
-        Tuple of (valid, error_message).
-    """
-    if not path.exists():
-        return (False, f"Directory does not exist: {path}")
-    if not path.is_dir():
-        return (False, f"Path is not a directory: {path}")
-    return (True, "")
+def validate_dir(path: Path) -> bool:
+    """Validate path exists and is a directory."""
+    return path.exists() and path.is_dir()
 
 
 def collect_upload_tasks(
@@ -117,23 +95,13 @@ def upload_file(
     local_path: Path,
     bucket_name: str,
     s3_key: str,
-) -> tuple[bool, str]:
-    """Upload single file.
-    
-    Args:
-        client: S3 client instance.
-        local_path: Local file path.
-        bucket_name: S3 bucket name.
-        s3_key: S3 object key.
-        
-    Returns:
-        Tuple of (success, error_message).
-    """
+) -> bool:
+    """Upload single file. Returns True on success, False on failure."""
     try:
         client.upload_file(str(local_path), bucket_name, s3_key)
-        return (True, "")
-    except Exception as e:
-        return (False, str(e))
+        return True
+    except Exception:
+        return False
 
 
 def upload_files_concurrently(
@@ -141,7 +109,7 @@ def upload_files_concurrently(
     tasks: list[tuple[Path, str]],
     bucket_name: str,
     max_workers: int = 4,
-) -> list[tuple[str, bool, str]]:
+) -> list[tuple[str, bool]]:
     """Upload multiple files concurrently.
     
     Args:
@@ -151,9 +119,9 @@ def upload_files_concurrently(
         max_workers: Number of concurrent upload threads.
         
     Returns:
-        List of (filename, success, error_message) tuples.
+        List of (filename, success) tuples.
     """
-    results: list[tuple[str, bool, str]] = []
+    results: list[tuple[str, bool]] = []
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = {
@@ -162,8 +130,8 @@ def upload_files_concurrently(
         }
         for future in as_completed(futures):
             filename = futures[future]
-            success, error = future.result()
-            results.append((filename, success, error))
+            success = future.result()
+            results.append((filename, success))
     
     return results
 

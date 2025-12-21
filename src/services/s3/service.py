@@ -15,8 +15,8 @@ from typing import Optional
 from services.s3.client import S3ClientProtocol, validate_bucket, get_s3_client
 from services.s3.operations import (
     delete_prefix,
-    validate_local_file,
-    validate_local_directory,
+    validate_file,
+    validate_dir,
     collect_upload_tasks,
     upload_file,
     upload_files_concurrently,
@@ -59,10 +59,9 @@ class S3Uploader:
         """
         local_path = Path(local_path)
         
-        valid, error = validate_local_file(local_path)
-        if not valid:
+        if not validate_file(local_path):
             if is_verbose:
-                print(f"✗ {error}")
+                print(f"✗ Invalid file path: {local_path}")
             return False
         
         if not validate_bucket(self._client, bucket_name):
@@ -70,10 +69,10 @@ class S3Uploader:
                 print(f"S3 Error: Cannot access bucket '{bucket_name}'")
             return False
         
-        success, error = upload_file(self._client, local_path, bucket_name, s3_key)
+        success = upload_file(self._client, local_path, bucket_name, s3_key)
         
         if not success and is_verbose:
-            print(f"S3 upload error: {error}")
+            print(f"✗ S3 upload failed: {s3_key}")
         
         return success
     
@@ -136,10 +135,9 @@ class S3Uploader:
         """
         local_dir = Path(local_dir)
         
-        valid, error = validate_local_directory(local_dir)
-        if not valid:
+        if not validate_dir(local_dir):
             if is_verbose:
-                print(f"✗ {error}")
+                print(f"✗ Invalid directory path: {local_dir}")
             return False
         
         if not validate_bucket(self._client, bucket_name):
@@ -162,12 +160,12 @@ class S3Uploader:
             self._client, tasks, bucket_name, max_workers
         )
         
-        failed = [(f, e) for f, s, e in results if not s]
+        failed = [f for f, s in results if not s]
         
         if failed and is_verbose:
             print(f"S3 upload errors: {len(failed)} failed")
-            for fname, err in failed[:3]:
-                print(f"  - {fname}: {err}")
+            for fname in failed[:3]:
+                print(f"  - {fname}")
         
         return len(failed) == 0
 
