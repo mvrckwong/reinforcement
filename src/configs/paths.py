@@ -30,6 +30,10 @@ class Paths(BaseSettings):
         default=_PROJECT_ROOT / "checkpoints", 
         description="Checkpoints directory."
     )
+    templates_dir: Path = Field(
+        default=_PROJECT_ROOT / "templates", 
+        description="Templates directory."
+    )
     env_file: Path = Field(
         default=_PROJECT_ROOT / ".env", 
         description="Environment file."
