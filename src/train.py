@@ -3,7 +3,8 @@
 from dotenv import load_dotenv
 
 from configs.paths import get_paths
-from configs.logging import get_logging_manager, upload_run_logs, logger
+from loguru import logger
+from services.logs import get_logging_manager, upload_run_logs
 from configs.run_context import RunContext
 from training import CheckpointManager, Trainer, create_algorithm_config
 from training.config import ENVIRONMENT
