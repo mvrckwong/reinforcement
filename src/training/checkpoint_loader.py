@@ -4,7 +4,7 @@ import tempfile
 from pathlib import Path
 from os import getenv
 
-import pendulum
+from loguru import logger
 from ray.rllib.algorithms.algorithm import Algorithm
 from ray.rllib.algorithms.algorithm_config import AlgorithmConfig
 
@@ -51,7 +51,7 @@ class CheckpointLoader:
             Algorithm instance loaded from checkpoint
         """
         if checkpoint_path:
-            print(f"Loading checkpoint from: {checkpoint_path}")
+            logger.info(f"Loading checkpoint from: {checkpoint_path}")
             return Algorithm.from_checkpoint(checkpoint_path)
         
         # Try local first if preferred (default for evaluation)
@@ -61,7 +61,7 @@ class CheckpointLoader:
             except FileNotFoundError as e:
                 # If S3 is configured, try that as fallback
                 if self.use_s3:
-                    print(f"No local checkpoints found. Attempting to load from S3...")
+                    logger.info("No local checkpoints found. Attempting to load from S3...")
                     return self._load_from_s3(config)
                 else:
                     # Re-raise if no S3 fallback available
@@ -124,7 +124,7 @@ class CheckpointLoader:
         # Use the directory itself as RLlib expects
         checkpoint_path = str(latest_dir)
         
-        print(f"Loading checkpoint from: {checkpoint_path}")
+        logger.info(f"Loading checkpoint from: {checkpoint_path}")
         return Algorithm.from_checkpoint(checkpoint_path)
     
     def _load_from_s3(self, config: AlgorithmConfig) -> Algorithm:

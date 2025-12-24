@@ -1,6 +1,7 @@
 """Metrics extraction and reporting utilities."""
 
 from typing import Any, Mapping
+
 from tqdm import tqdm
 
 
@@ -29,11 +30,11 @@ def extract_metric(
     return default
 
 
-def print_training_metrics(
+def log_training_metrics(
     iteration: int,
     result: Mapping[str, Any],
 ) -> None:
-    """Print formatted training metrics.
+    """Log formatted training metrics.
     
     Args:
         iteration: Current iteration number
@@ -60,10 +61,11 @@ def print_training_metrics(
         default=extract_metric(result, "env_steps_sampled", 0)
     )
 
+    # Use tqdm.write for clean output alongside progress bars
     tqdm.write(
-        f"Iter {iteration:2d} | "
+        f"Iter {iteration:3d} | "
         f"Episodes: {episodes:6.0f} | "
-        f"Reward: {reward:6.2f} | "
+        f"Reward: {reward:7.2f} | "
         f"Length: {length:6.2f} | "
         f"Steps: {steps:8.0f}"
     )

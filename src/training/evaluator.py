@@ -2,6 +2,7 @@
 
 from typing import Any, Mapping
 
+from loguru import logger
 from ray.rllib.algorithms.algorithm import Algorithm
 from tqdm import tqdm
 
@@ -36,7 +37,7 @@ class Evaluator:
         Returns:
             Dictionary containing evaluation statistics
         """
-        print(f"Evaluating for {self.num_episodes} episodes...")
+        logger.info(f"Evaluating for {self.num_episodes} episodes...")
         
         for episode in tqdm(range(self.num_episodes), desc="Evaluating", unit="episode"):
             episode_reward, episode_length = self._run_episode()
@@ -126,6 +127,7 @@ class Evaluator:
         Args:
             stats: Statistics dictionary from evaluate()
         """
+        # Use print for clean formatted output (no timestamps)
         print("\n" + "=" * 60)
         print("EVALUATION RESULTS")
         print("=" * 60)

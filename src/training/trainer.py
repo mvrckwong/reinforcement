@@ -6,7 +6,7 @@ from ray.rllib.algorithms.algorithm import Algorithm
 from tqdm import tqdm
 
 from training.checkpoint import CheckpointManager
-from training.metrics import extract_metric, print_training_metrics
+from training.metrics import extract_metric, log_training_metrics
 
 
 class Trainer:
@@ -56,7 +56,7 @@ class Trainer:
         """Execute the main training loop with smart checkpointing."""
         for i in tqdm(range(self.num_iterations), desc="Training", unit="iter"):
             result = self.algo.train()
-            print_training_metrics(i + 1, result)
+            log_training_metrics(i + 1, result)
             
             # Extract current metrics
             current_reward = extract_metric(

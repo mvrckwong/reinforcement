@@ -28,6 +28,7 @@ from pathlib import Path
 from os import getenv
 from typing import TYPE_CHECKING, Any
 
+from loguru import logger
 from ray.rllib.algorithms.algorithm import Algorithm
 from tqdm import tqdm
 
@@ -88,9 +89,9 @@ class CheckpointManager:
     def _log_storage_mode(self) -> None:
         """Log which storage mode is being used."""
         if self._s3_available:
-            print(f"✓ S3 available - artifacts will be saved to s3://{self.s3_paths.artifacts_bucket}/{self.context.run_prefix}")
+            logger.success(f"S3 available - artifacts will be saved to s3://{self.s3_paths.artifacts_bucket}/{self.context.run_prefix}")
         else:
-            print("✗ S3 not available - using local storage")
+            logger.warning("S3 not available - using local storage")
             self._setup_local_dir()
     
     def _setup_local_dir(self) -> Path:
@@ -98,7 +99,7 @@ class CheckpointManager:
         if self._local_dir is None:
             self._local_dir = get_paths().checkpoints_dir / self.context.run_prefix
             self._local_dir.mkdir(parents=True, exist_ok=True)
-            print(f"Checkpoints will be saved to: {self._local_dir}")
+            logger.info(f"Checkpoints will be saved to: {self._local_dir}")
         return self._local_dir
     
     def _get_s3_prefix(self, checkpoint_type: CheckpointType) -> str:
@@ -132,7 +133,7 @@ class CheckpointManager:
                 return True
             # S3 failed, fall back to local
             if is_verbose:
-                tqdm.write("S3 upload failed, falling back to local storage")
+                tqdm.write("⚠ S3 upload failed, falling back to local storage")
             self._s3_available = False
             self._setup_local_dir()
         
@@ -239,7 +240,11 @@ class CheckpointManager:
             
             if is_verbose and success:
                 msg = f"✓ Checkpoint [{checkpoint_type.value}] → s3://{self.s3_paths.artifacts_bucket}/{s3_prefix}"
-                tqdm.write(msg) if checkpoint_type != CheckpointType.FINAL else print(msg)
+                # Use tqdm.write for best/latest (during training), logger for final (after training)
+                if checkpoint_type == CheckpointType.FINAL:
+                    logger.success(msg)
+                else:
+                    tqdm.write(msg)
             
             return success
         except Exception as e:
@@ -267,7 +272,12 @@ class CheckpointManager:
         try:
             checkpoint_path = algo.save(str(checkpoint_dir))
             if is_verbose:
-                tqdm.write(f"✓ Checkpoint [{checkpoint_type.value}] → {checkpoint_path}")
+                msg = f"✓ Checkpoint [{checkpoint_type.value}] → {checkpoint_path}"
+                # Use tqdm.write for best/latest (during training), logger for final (after training)
+                if checkpoint_type == CheckpointType.FINAL:
+                    logger.success(msg)
+                else:
+                    tqdm.write(msg)
             return True
         except Exception as e:
             if is_verbose:
@@ -295,12 +305,12 @@ class CheckpointManager:
             )
             
             if is_verbose and success:
-                print(f"✓ Metadata → s3://{self.s3_paths.artifacts_bucket}/{self.context.metadata_key}")
+                logger.success(f"Metadata → s3://{self.s3_paths.artifacts_bucket}/{self.context.metadata_key}")
             
             return success
         except Exception as e:
             if is_verbose:
-                print(f"✗ Failed to save metadata: {e}")
+                logger.error(f"Failed to save metadata: {e}")
             return False
         finally:
             temp_file.unlink(missing_ok=True)
@@ -317,11 +327,11 @@ class CheckpointManager:
         try:
             metadata_path.write_text(json.dumps(metadata, indent=2, default=str))
             if is_verbose:
-                print(f"✓ Metadata → {metadata_path}")
+                logger.success(f"Metadata → {metadata_path}")
             return True
         except Exception as e:
             if is_verbose:
-                print(f"✗ Failed to save metadata: {e}")
+                logger.error(f"Failed to save metadata: {e}")
             return False
     
     @classmethod
