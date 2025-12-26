@@ -25,3 +25,9 @@ dependencies = [
 notebook = [
     "python-dotenv>=1.2.1",
 ]
+ref = [
+    "ccxt>=4.5.29",
+    "schedule>=1.2.2",
+    "termcolor>=3.2.0",
+    "websockets>=15.0.1",
+]

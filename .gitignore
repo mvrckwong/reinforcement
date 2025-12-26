@@ -1,3 +1,6 @@
+# General
+*.csv
+
 # JetBrains IDE
 .idea/
 
