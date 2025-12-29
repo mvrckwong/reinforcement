@@ -22,18 +22,29 @@ _PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 class Paths(BaseSettings):
     """Local filesystem paths configuration."""
     
+    # General directories
+    checkpoints_dir: Path = Field(
+        default=_PROJECT_ROOT / "checkpoints", 
+        description="Checkpoints directory."
+    )
+    configs_dir: Path = Field(
+        default=_PROJECT_ROOT / "configs", 
+        description="Configs directory."
+    )
     logs_dir: Path = Field(
         default=_PROJECT_ROOT / "logs", 
         description="Logs directory."
     )
-    checkpoints_dir: Path = Field(
-        default=_PROJECT_ROOT / "checkpoints", 
-        description="Checkpoints directory."
+    outputs_dir: Path = Field(
+        default=_PROJECT_ROOT / "outputs", 
+        description="Outputs directory."
     )
     templates_dir: Path = Field(
         default=_PROJECT_ROOT / "templates", 
         description="Templates directory."
     )
+
+    # Files (environment file, etc.)
     env_file: Path = Field(
         default=_PROJECT_ROOT / ".env", 
         description="Environment file."
