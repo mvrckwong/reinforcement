@@ -22,8 +22,17 @@ dependencies = [
 ]
 
 [dependency-groups]
+dev = [
+    "pandas>=2.3.3",
+]
 notebook = [
     "python-dotenv>=1.2.1",
+]
+notebooks = [
+    "fredapi>=0.5.2",
+    "matplotlib>=3.10.8",
+    "numpy>=1.26.4",
+    "pandas>=2.3.3",
 ]
 ref = [
     "ccxt>=4.5.29",
