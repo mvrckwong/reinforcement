@@ -15,8 +15,8 @@ from functools import lru_cache
 from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Computed once at module load
-_PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+# Computed once at module load (2 levels: configs/paths.py -> root)
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 
 class Paths(BaseSettings):
