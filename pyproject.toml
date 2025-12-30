@@ -29,12 +29,6 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
-    "pandas>=2.3.3",
-]
-notebook = [
-    "python-dotenv>=1.2.1",
-]
 notebooks = [
     "fredapi>=0.5.2",
     "matplotlib>=3.10.8",
@@ -46,4 +40,7 @@ ref = [
     "schedule>=1.2.2",
     "termcolor>=3.2.0",
     "websockets>=15.0.1",
+]
+tool = [
+    "nbstripout>=0.8.2",
 ]
