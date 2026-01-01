@@ -18,18 +18,20 @@ class Deployment(str, Enum):
         if not isinstance(value, str):
             return None
         
+        # Normalize then look up in aliases
         normalized = value.lower().strip()
-        
         aliases: dict[str, 'Deployment'] = {
             # Development
             'dev': cls.DEV,
             'development': cls.DEV,
             'local': cls.DEV,
+
             # Staging
             'stg': cls.STG,
             'staging': cls.STG,
             'stage': cls.STG,
             'uat': cls.STG,
+            
             # Production
             'prd': cls.PROD,
             'prod': cls.PROD,
