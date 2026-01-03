@@ -1,0 +1,32 @@
+# General configuration
+environment:
+  name: development
+  debug: true
+  
+# Resource allocation
+resources:
+  num_workers: 2  # Laptop-friendly
+  pin_memory: true
+  device: auto  # auto-detect GPU/CPU
+
+# File paths (infrastructure - where things are stored)
+paths:
+  data_dir: ./data/dev
+  output_dir: ./outputs/dev
+  checkpoint_dir: ./checkpoints/dev
+
+# Logging configuration (infrastructure - how to track)
+logging:
+  console:
+    enabled: true
+    level: INFO
+    interval: 5
+  
+  wandb:
+    enabled: false
+    project: null
+    entity: null
+  
+  checkpoint:
+    save_interval: 2  # Save every 2 epochs
+    keep_last_n: 3    # Keep only last 3 checkpoints

@@ -1,0 +1,28 @@
+environment:
+  name: staging
+  debug: false
+
+resources:
+  num_workers: 8
+  pin_memory: true
+  device: cuda
+
+paths:
+  data_dir: /mnt/staging/data
+  output_dir: /mnt/staging/outputs
+  checkpoint_dir: /mnt/staging/checkpoints
+
+logging:
+  console:
+    enabled: true
+    level: INFO
+    interval: 20
+  
+  wandb:
+    enabled: true
+    project: my_project_staging
+    entity: my_team
+  
+  checkpoint:
+    save_interval: 5
+    keep_last_n: 5

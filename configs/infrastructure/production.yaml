@@ -1,0 +1,47 @@
+environment:
+  name: production
+  debug: false
+
+resources:
+  num_workers: 16
+  pin_memory: true
+  device: cuda
+  
+  # Production-specific resource management
+  distributed:
+    enabled: false  # Set to true for multi-GPU
+    backend: nccl
+    world_size: 1
+
+paths:
+  data_dir: /mnt/production/data
+  output_dir: /mnt/production/outputs
+  checkpoint_dir: /mnt/production/checkpoints
+  
+  # Production backup paths
+  backup:
+    enabled: true
+    s3_bucket: my-training-checkpoints
+    sync_interval: 10  # Sync to S3 every 10 epochs
+
+logging:
+  console:
+    enabled: true
+    level: INFO
+    interval: 50
+  
+  wandb:
+    enabled: true
+    project: my_project_production
+    entity: my_team
+    tags: [production, v1.0]
+  
+  checkpoint:
+    save_interval: 10
+    keep_last_n: 10
+
+  # Production monitoring
+  monitoring:
+    enabled: true
+    alert_on_loss_spike: true
+    alert_threshold: 2.0

@@ -6,6 +6,33 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+class Debug(bool, Enum):
+    """Debug mode."""
+    TRUE = True
+    FALSE = False
+
+    @classmethod
+    def _missing_(cls, value: object):
+        """Handle alternative names for debug mode."""
+        if not isinstance(value, str):
+            return None
+        
+        normalized = value.lower().strip()
+        aliases: dict[str, 'Debug'] = {
+            'true': cls.TRUE,
+            'yes': cls.TRUE,
+            '1': cls.TRUE,
+            'false': cls.FALSE,
+            'no': cls.FALSE,
+            '0': cls.FALSE,
+        }
+    
+    @property
+    def is_debug(self) -> bool:
+        """Check if this is a debug environment."""
+        return self == Debug.TRUE
+
+
 class Deployment(str, Enum):
     """Deployment environment."""
     DEV = 'development'
